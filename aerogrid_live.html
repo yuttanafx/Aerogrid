@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>AEROGRID — แผนที่ความหนาแน่นคุณภาพอากาศโลก (Live)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root{
+    --hairline: rgba(180,200,220,0.10);
+    --c-good: #4FD1B8;
+    --c-moderate: #E8C25A;
+    --c-usg: #E89B4C;
+    --c-unhealthy: #E1615E;
+    --c-veryunhealthy: #A667C9;
+    --c-hazardous: #B0466B;
+  }
+  [data-theme="dark"]{
+    --bg: #090c11; --bg-panel: #0f141b; --bg-panel-2: #131a22;
+    --text: #E7EEF3; --text-dim: #7E8B98; --text-faint: #4A5560;
+    --hairline: rgba(180,200,220,0.10);
+    --input-bg:#0c1119;
+  }
+  [data-theme="light"]{
+    --bg: #F1F4F7; --bg-panel: #FFFFFF; --bg-panel-2: #F7F9FB;
+    --text: #101820; --text-dim: #5B6773; --text-faint: #93A0AB;
+    --hairline: rgba(10,25,40,0.09);
+    --input-bg:#FFFFFF;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:'IBM Plex Sans Thai','IBM Plex Sans',sans-serif;
+    -webkit-font-smoothing:antialiased; overflow-x:hidden;
+    transition:background .25s ease, color .25s ease;
+  }
+  body[data-lang="zh"]{ font-family:'Noto Sans SC','IBM Plex Sans',sans-serif; }
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .display{font-family:'Space Grotesk','IBM Plex Sans Thai',sans-serif;}
+  @media (prefers-reduced-motion: reduce){ *{animation-duration:.01ms !important; transition-duration:.01ms !important;} }
+  a{color:inherit;}
+  ::selection{background:var(--c-usg); color:#0a0a0a;}
+
+  nav{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:18px 40px; border-bottom:1px solid var(--hairline);
+    position:relative; z-index:20; gap:16px; flex-wrap:wrap;
+  }
+  .brand{ display:flex; align-items:center; gap:10px; font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:18px; }
+  .brand-mark{ width:10px; height:10px; border-radius:50%; background:var(--c-usg);
+    box-shadow:0 0 0 3px rgba(232,155,76,0.15); animation: mark-pulse 2.6s ease-in-out infinite; flex-shrink:0;}
+  @keyframes mark-pulse{ 0%,100%{box-shadow:0 0 0 3px rgba(232,155,76,0.15);} 50%{box-shadow:0 0 0 7px rgba(232,155,76,0.03);} }
+
+  .nav-right{ display:flex; align-items:center; gap:14px; }
+  .langsw{ display:flex; border:1px solid var(--hairline); border-radius:8px; overflow:hidden; }
+  .langsw button{
+    background:none; border:none; color:var(--text-dim); font-family:'IBM Plex Mono',monospace;
+    font-size:12px; padding:8px 12px; cursor:pointer; transition:.15s;
+  }
+  .langsw button.active{ background:var(--c-usg); color:#0a0a0a; font-weight:600; }
+  .langsw button:not(.active):hover{ color:var(--text); background:var(--bg-panel-2); }
+
+  .theme-toggle{
+    width:36px; height:36px; border-radius:50%; border:1px solid var(--hairline);
+    background:var(--bg-panel); cursor:pointer; display:flex; align-items:center; justify-content:center;
+    position:relative; flex-shrink:0;
+  }
+  .theme-toggle svg{ width:17px; height:17px; }
+  .icon-sun{ display:none; }
+  .icon-moon{ display:block; }
+  [data-theme="light"] .icon-sun{ display:block; }
+  [data-theme="light"] .icon-moon{ display:none; }
+  .theme-toggle .icon-sun{ color:#E8C25A; }
+  .theme-toggle .icon-moon{ color:#9AB0C7; }
+  button:focus-visible, .card:focus-visible, input:focus-visible{ outline:2px solid var(--c-usg); outline-offset:2px; }
+
+  .hero{ position:relative; padding:48px 40px 20px; max-width:1360px; margin:0 auto; }
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.14em; text-transform:uppercase;
+    color:var(--c-usg); display:flex; align-items:center; gap:10px; margin-bottom:18px;
+  }
+  .eyebrow::before{ content:''; width:22px; height:1px; background:var(--c-usg); opacity:.6; }
+  .hero-grid{ display:grid; grid-template-columns:1.05fr 0.95fr; gap:40px; align-items:end; }
+  @media (max-width:980px){ .hero-grid{grid-template-columns:1fr;} }
+  h1{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:clamp(28px,4vw,48px); line-height:1.08; letter-spacing:-0.01em; margin:0 0 16px; }
+  body[data-lang="zh"] h1{ font-family:'Noto Sans SC','Space Grotesk',sans-serif; }
+  h1 em{ font-style:normal; background:linear-gradient(90deg, var(--c-usg), var(--c-unhealthy)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .hero-sub{ color:var(--text-dim); font-size:15.5px; line-height:1.65; max-width:48ch; margin:0 0 24px; }
+  .hero-stat-row{ display:flex; gap:32px; flex-wrap:wrap; }
+  .stat-num{ font-family:'IBM Plex Mono',monospace; font-size:30px; font-weight:600; }
+  .stat-label{ font-size:11.5px; color:var(--text-faint); margin-top:4px; max-width:16ch; }
+
+  .map-panel{ background:var(--bg-panel); border:1px solid var(--hairline); border-radius:14px; padding:14px; position:relative; }
+  .map-panel-head{ display:flex; justify-content:space-between; align-items:center; padding:2px 6px 12px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--text-faint); letter-spacing:.06em; text-transform:uppercase; gap:10px; flex-wrap:wrap;}
+  .live-dot{ width:6px; height:6px; border-radius:50%; background:var(--c-good); display:inline-block; margin-right:6px; animation: live 1.8s ease-in-out infinite; }
+  @keyframes live{ 0%,100%{opacity:1;} 50%{opacity:.25;} }
+  .refresh-btn{
+    font-family:'IBM Plex Mono',monospace; font-size:11px; padding:6px 10px; border-radius:6px;
+    border:1px solid var(--hairline); background:var(--bg-panel-2); color:var(--text); cursor:pointer;
+  }
+  .refresh-btn:hover{ border-color:var(--c-usg); }
+  .refresh-btn:disabled{ opacity:.5; cursor:default; }
+
+  #leafletMap{ width:100%; height:420px; border-radius:10px; overflow:hidden; }
+  .leaflet-popup-content-wrapper{ background:var(--bg-panel); color:var(--text); border-radius:8px; }
+  .leaflet-popup-tip{ background:var(--bg-panel); }
+  .popup-city{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:14px; margin-bottom:2px; }
+  .popup-aqi{ font-family:'IBM Plex Mono',monospace; font-size:22px; font-weight:600; }
+  .popup-band{ font-size:11px; margin-top:2px; }
+  .popup-meta{ font-size:10.5px; color:var(--text-faint); margin-top:6px; }
+
+  .key-panel{
+    display:flex; gap:8px; align-items:center; padding:10px 6px 4px; flex-wrap:wrap;
+    font-size:12px; color:var(--text-dim);
+  }
+  .key-panel input{
+    background:var(--input-bg); border:1px solid var(--hairline); color:var(--text);
+    border-radius:6px; padding:8px 10px; font-family:'IBM Plex Mono',monospace; font-size:12px;
+    flex:1; min-width:180px;
+  }
+  .key-panel button{
+    font-family:'IBM Plex Mono',monospace; font-size:11px; padding:8px 12px; border-radius:6px;
+    border:1px solid var(--hairline); background:var(--c-usg); color:#0a0a0a; cursor:pointer; font-weight:600;
+  }
+  .key-status{ font-size:11px; color:var(--text-faint); padding:0 6px 6px; }
+  .key-status a{ color:var(--c-usg); text-decoration:underline; }
+
+  .legend-strip{ max-width:1360px; margin:0 auto; padding:24px 40px 8px; display:flex; flex-wrap:wrap; gap:20px; align-items:center; border-bottom:1px solid var(--hairline); }
+  .legend-item{ display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-dim); }
+  .legend-swatch{ width:9px; height:9px; border-radius:2px; flex-shrink:0; }
+  .legend-title{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--text-faint); text-transform:uppercase; letter-spacing:.1em; margin-right:4px; }
+
+  .section{ max-width:1360px; margin:0 auto; padding:48px 40px 30px; }
+  .section-head{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:24px; gap:20px; flex-wrap:wrap; }
+  .section-title{ font-family:'Space Grotesk',sans-serif; font-size:21px; font-weight:600; }
+  .section-note{ font-size:13px; color:var(--text-faint); max-width:38ch; }
+
+  .grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+  @media (max-width:920px){ .grid{grid-template-columns:repeat(2,1fr);} }
+  @media (max-width:600px){ .grid{grid-template-columns:1fr;} }
+
+  .card{ background:var(--bg-panel); border:1px solid var(--hairline); border-radius:12px; padding:20px 20px 18px; position:relative; transition:border-color .2s, transform .2s; }
+  .card:hover{ border-color:rgba(150,160,170,0.35); transform:translateY(-2px); }
+  .card-top{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px;}
+  .continent-name{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:16px; }
+  .continent-city{ font-size:12px; color:var(--text-faint); margin-top:2px; }
+  .band-pill{ font-family:'IBM Plex Mono',monospace; font-size:10px; padding:3px 8px; border-radius:20px; white-space:nowrap; font-weight:600; }
+  .aqi-num{ font-family:'IBM Plex Mono',monospace; font-size:36px; font-weight:600; line-height:1; }
+  .aqi-unit{ font-size:11px; color:var(--text-faint); margin-top:6px; }
+  .bar-track{ height:5px; border-radius:3px; background:rgba(140,150,160,0.16); margin-top:16px; overflow:hidden; }
+  .bar-fill{ height:100%; border-radius:3px; transition:width .5s ease; }
+  .card-foot{ display:flex; justify-content:space-between; margin-top:12px; font-size:11px; color:var(--text-faint); }
+  .skeleton{ opacity:.45; }
+
+  footer{ max-width:1360px; margin:0 auto; padding:30px 40px 60px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:14px; color:var(--text-faint); font-size:12px; border-top:1px solid var(--hairline); }
+  .disclosure{ max-width:1360px; margin:0 auto; padding:0 40px; font-size:11.5px; color:var(--text-faint); line-height:1.6; }
+</style>
+</head>
+<body data-theme="dark" data-lang="th">
+
+<nav>
+  <div class="brand"><span class="brand-mark"></span>AEROGRID</div>
+  <div class="nav-right">
+    <div class="langsw" role="group" aria-label="Language">
+      <button data-lang-btn="th" class="active">TH</button>
+      <button data-lang-btn="en">EN</button>
+      <button data-lang-btn="zh">中文</button>
+    </div>
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="currentColor"><path d="M20.4 14.9c-.3-.1-.7 0-1 .2-1.1.9-2.5 1.4-4 1.4-3.6 0-6.5-2.9-6.5-6.5 0-1.5.5-2.9 1.4-4 .2-.3.3-.7.2-1-.2-.3-.5-.5-.9-.4-4.3.7-7.5 4.5-7.5 8.9 0 5 4 9 9 9 4.4 0 8.1-3.1 8.9-7.5.1-.4-.1-.8-.4-1z"/></svg>
+    </button>
+  </div>
+</nav>
+
+<div class="hero" id="map">
+  <div class="eyebrow" data-i18n="eyebrow">Live Air Density Index</div>
+  <div class="hero-grid">
+    <div>
+      <h1 data-i18n-html="h1"></h1>
+      <p class="hero-sub" data-i18n="sub"></p>
+      <div class="hero-stat-row">
+        <div class="stat"><div class="stat-num mono" style="color:var(--c-usg);" id="globalAvg">—</div><div class="stat-label" data-i18n="statAvg"></div></div>
+        <div class="stat"><div class="stat-num mono" id="statCities">14</div><div class="stat-label" data-i18n="statCities"></div></div>
+        <div class="stat"><div class="stat-num mono" style="color:var(--c-unhealthy);" id="statDanger">—</div><div class="stat-label" data-i18n="statDanger"></div></div>
+      </div>
+    </div>
+
+    <div class="map-panel">
+      <div class="map-panel-head">
+        <span><span class="live-dot"></span><span data-i18n="scanning"></span></span>
+        <button class="refresh-btn" id="refreshBtn" data-i18n="refresh"></button>
+      </div>
+      <div id="leafletMap"></div>
+      <div class="key-panel">
+        <span data-i18n="apiKeyLabel"></span>
+        <input type="text" id="apiKeyInput" placeholder="IQAir API key" autocomplete="off" spellcheck="false">
+        <button id="apiKeySave" data-i18n="save"></button>
+      </div>
+      <div class="key-status" id="keyStatus"></div>
+    </div>
+  </div>
+</div>
+
+<div class="legend-strip" id="legend">
+  <span class="legend-title" data-i18n="legendTitle"></span>
+  <div class="legend-item"><span class="legend-swatch" style="background:#4FD1B8;"></span><span data-i18n="bandGood"></span> 0–50</div>
+  <div class="legend-item"><span class="legend-swatch" style="background:#E8C25A;"></span><span data-i18n="bandModerate"></span> 51–100</div>
+  <div class="legend-item"><span class="legend-swatch" style="background:#E89B4C;"></span><span data-i18n="bandUsg"></span> 101–150</div>
+  <div class="legend-item"><span class="legend-swatch" style="background:#E1615E;"></span><span data-i18n="bandUnhealthy"></span> 151–200</div>
+  <div class="legend-item"><span class="legend-swatch" style="background:#A667C9;"></span><span data-i18n="bandVeryUnhealthy"></span> 201–300</div>
+  <div class="legend-item"><span class="legend-swatch" style="background:#B0466B;"></span><span data-i18n="bandHazardous"></span> 300+</div>
+</div>
+
+<div class="section" id="continents">
+  <div class="section-head">
+    <div class="section-title" data-i18n="sectionTitle"></div>
+    <div class="section-note" data-i18n="sectionNote"></div>
+  </div>
+  <div class="grid" id="continentGrid"></div>
+</div>
+
+<p class="disclosure" id="about" data-i18n-html="disclosure"></p>
+
+<footer>
+  <div data-i18n="footerLeft"></div>
+  <div data-i18n="footerRight"></div>
+</footer>
+
+<script>
+/* ---------------- i18n ---------------- */
+const I18N = {
+  th: {
+    eyebrow: "ดัชนีความหนาแน่นอากาศ (เรียลไทม์)",
+    h1: 'ความหนาแน่นอากาศ<br>ของโลก <em>มองเห็นได้</em> จริง',
+    sub: "AEROGRID ดึงค่าคุณภาพอากาศสดจาก IQAir มาแสดงบนแผนที่จริง — ยิ่งจุดใหญ่และสว่างเท่าไหร่ อากาศบริเวณนั้นยิ่งหนาแน่นด้วยมลพิษมากเท่านั้น",
+    statAvg: "ค่าเฉลี่ย AQI ทั่วโลกตอนนี้",
+    statCities: "เมืองที่ตรวจวัดในหน้านี้",
+    statDanger: "เมืองที่อยู่ในระดับอันตราย",
+    scanning: "สแกนสถานีตรวจวัด ณ ขณะนี้",
+    refresh: "ดึงข้อมูลใหม่",
+    apiKeyLabel: "IQAir API key:",
+    save: "บันทึก",
+    legendTitle: "มาตรฐาน AQI",
+    bandGood: "ดี", bandModerate: "ปานกลาง", bandUsg: "มีผลต่อกลุ่มเสี่ยง",
+    bandUnhealthy: "เริ่มเป็นอันตราย", bandVeryUnhealthy: "อันตรายมาก", bandHazardous: "อันตรายร้ายแรง",
+    sectionTitle: "ความหนาแน่นอากาศแยกตามทวีป",
+    sectionNote: "ตัวเลขคือค่า AQI สดจากเมืองตัวแทนของแต่ละทวีป ดึงตรงจาก IQAir",
+    disclosure: '* เมื่อใส่ API key ของคุณเองแล้ว ตัวเลขทั้งหมดในหน้านี้จะเป็น <strong>ข้อมูลจริงแบบเรียลไทม์จาก IQAir</strong> หากยังไม่ใส่คีย์ หน้านี้จะแสดงสถานะ "รอข้อมูล" แทน แผนที่ฐาน © OpenStreetMap contributors, © CARTO',
+    footerLeft: "AEROGRID — Air Density Visualization · Live Build 2026",
+    footerRight: "แหล่งข้อมูล: IQAir (AirVisual API)",
+    loading: "กำลังโหลด…",
+    noKey: "รอ API key",
+    error: "โหลดไม่สำเร็จ",
+    needKey: "ยังไม่ได้ใส่ API key — ", getKeyLink: "ขอฟรีที่ IQAir",
+    keyOk: "บันทึกคีย์แล้ว กำลังดึงข้อมูล…",
+    corsWarn: "หากคำขอถูกบล็อกโดยเบราว์เซอร์ (CORS) ให้เชื่อมผ่านเซิร์ฟเวอร์ฝั่งคุณเองแทนการเรียกตรงจากหน้าเว็บ",
+    updated: "อัปเดตล่าสุด",
+    stations: "สถานีในทวีปนี้"
+  },
+  en: {
+    eyebrow: "Live Air Density Index",
+    h1: 'The world\'s air,<br><em>made visible</em>',
+    sub: "AEROGRID pulls live air quality readings from IQAir onto a real map — the bigger and brighter a point, the denser the pollution in that area.",
+    statAvg: "Current global average AQI",
+    statCities: "Cities tracked on this page",
+    statDanger: "Cities at a dangerous level",
+    scanning: "Scanning monitoring stations",
+    refresh: "Refresh data",
+    apiKeyLabel: "IQAir API key:",
+    save: "Save",
+    legendTitle: "AQI scale",
+    bandGood: "Good", bandModerate: "Moderate", bandUsg: "Unhealthy for sensitive groups",
+    bandUnhealthy: "Unhealthy", bandVeryUnhealthy: "Very unhealthy", bandHazardous: "Hazardous",
+    sectionTitle: "Air density by continent",
+    sectionNote: "Live AQI from a representative city in each continent, pulled directly from IQAir.",
+    disclosure: '* Once you add your own API key, every number on this page is <strong>live real-time data from IQAir</strong>. Without a key, cards show a "waiting for data" state instead. Basemap © OpenStreetMap contributors, © CARTO',
+    footerLeft: "AEROGRID — Air Density Visualization · Live Build 2026",
+    footerRight: "Data source: IQAir (AirVisual API)",
+    loading: "Loading…",
+    noKey: "Waiting for key",
+    error: "Failed to load",
+    needKey: "No API key set — ", getKeyLink: "get one free from IQAir",
+    keyOk: "Key saved, fetching data…",
+    corsWarn: "If requests are blocked by the browser (CORS), proxy them through your own backend instead of calling directly from the page.",
+    updated: "Updated",
+    stations: "stations in this continent"
+  },
+  zh: {
+    eyebrow: "空气密度实时指数",
+    h1: '让世界的空气<br><em>清晰可见</em>',
+    sub: "AEROGRID 从 IQAir 获取实时空气质量数据并显示在真实地图上——光点越大越亮，代表该地区污染越密集。",
+    statAvg: "当前全球平均 AQI",
+    statCities: "本页追踪的城市数",
+    statDanger: "处于危险级别的城市",
+    scanning: "正在扫描监测站",
+    refresh: "刷新数据",
+    apiKeyLabel: "IQAir API 密钥：",
+    save: "保存",
+    legendTitle: "AQI 分级标准",
+    bandGood: "良好", bandModerate: "中等", bandUsg: "对敏感人群不健康",
+    bandUnhealthy: "不健康", bandVeryUnhealthy: "非常不健康", bandHazardous: "危险",
+    sectionTitle: "各大洲空气密度",
+    sectionNote: "每个大洲代表城市的实时 AQI，直接来自 IQAir。",
+    disclosure: '* 输入您自己的 API 密钥后，本页所有数字均为 <strong>来自 IQAir 的实时数据</strong>。未输入密钥时，卡片将显示“等待数据”状态。底图 © OpenStreetMap contributors, © CARTO',
+    footerLeft: "AEROGRID — 空气密度可视化 · 2026 实时版本",
+    footerRight: "数据来源：IQAir (AirVisual API)",
+    loading: "加载中…",
+    noKey: "等待密钥",
+    error: "加载失败",
+    needKey: "尚未设置 API 密钥 — ", getKeyLink: "前往 IQAir 免费申请",
+    keyOk: "密钥已保存，正在获取数据…",
+    corsWarn: "如果浏览器因 CORS 阻止请求，请通过您自己的后端代理调用，而不是从页面直接请求。",
+    updated: "更新于",
+    stations: "个监测站"
+  }
+};
+
+/* ---------------- Cities ---------------- */
+// continent: asia, africa, namerica, samerica, europe, oceania
+const CITIES = [
+  { id:"delhi",   lat:28.6139, lon:77.2090,  continent:"asia",     rep:true,  name:{th:"เดลี",           en:"Delhi",       zh:"德里"} },
+  { id:"beijing", lat:39.9042, lon:116.4074, continent:"asia",     rep:false, name:{th:"ปักกิ่ง",         en:"Beijing",     zh:"北京"} },
+  { id:"jakarta", lat:-6.2088, lon:106.8456, continent:"asia",     rep:false, name:{th:"จาการ์ตา",       en:"Jakarta",     zh:"雅加达"} },
+  { id:"bangkok", lat:13.7563, lon:100.5018, continent:"asia",     rep:false, name:{th:"กรุงเทพฯ",       en:"Bangkok",     zh:"曼谷"} },
+  { id:"cairo",   lat:30.0444, lon:31.2357,  continent:"africa",   rep:true,  name:{th:"ไคโร",           en:"Cairo",       zh:"开罗"} },
+  { id:"lagos",   lat:6.5244,  lon:3.3792,   continent:"africa",   rep:false, name:{th:"ลากอส",          en:"Lagos",       zh:"拉各斯"} },
+  { id:"mexico",  lat:19.4326, lon:-99.1332, continent:"namerica", rep:true,  name:{th:"เม็กซิโกซิตี",   en:"Mexico City", zh:"墨西哥城"} },
+  { id:"la",      lat:34.0522, lon:-118.2437,continent:"namerica", rep:false, name:{th:"ลอสแอนเจลิส",   en:"Los Angeles", zh:"洛杉矶"} },
+  { id:"santiago",lat:-33.4489,lon:-70.6693, continent:"samerica", rep:true,  name:{th:"ซันติอาโก",      en:"Santiago",    zh:"圣地亚哥"} },
+  { id:"saopaulo",lat:-23.5505,lon:-46.6333, continent:"samerica", rep:false, name:{th:"เซาเปาโล",       en:"São Paulo",   zh:"圣保罗"} },
+  { id:"warsaw",  lat:52.2297, lon:21.0122,  continent:"europe",   rep:true,  name:{th:"วอร์ซอ",         en:"Warsaw",      zh:"华沙"} },
+  { id:"london",  lat:51.5074, lon:-0.1278,  continent:"europe",   rep:false, name:{th:"ลอนดอน",         en:"London",      zh:"伦敦"} },
+  { id:"sydney",  lat:-33.8688,lon:151.2093, continent:"oceania",  rep:true,  name:{th:"ซิดนีย์",         en:"Sydney",      zh:"悉尼"} },
+  { id:"auckland",lat:-36.8485,lon:174.7633, continent:"oceania",  rep:false, name:{th:"โอ๊คแลนด์",       en:"Auckland",    zh:"奥克兰"} },
+];
+
+const CONTINENT_NAME = {
+  asia:     {th:"เอเชีย",         en:"Asia",          zh:"亚洲"},
+  africa:   {th:"แอฟริกา",        en:"Africa",        zh:"非洲"},
+  namerica: {th:"อเมริกาเหนือ",   en:"North America", zh:"北美洲"},
+  samerica: {th:"อเมริกาใต้",     en:"South America", zh:"南美洲"},
+  europe:   {th:"ยุโรป",          en:"Europe",        zh:"欧洲"},
+  oceania:  {th:"โอเชียเนีย",     en:"Oceania",       zh:"大洋洲"},
+};
+const CONTINENT_ORDER = ["asia","africa","namerica","samerica","europe","oceania"];
+
+/* ---------------- State ---------------- */
+let state = { lang:"th", theme:"dark", apiKey:"", markers:{}, results:{} };
+
+/* ---------------- AQI helpers ---------------- */
+function band(aqi){
+  if (aqi==null) return null;
+  if (aqi<=50) return "good";
+  if (aqi<=100) return "moderate";
+  if (aqi<=150) return "usg";
+  if (aqi<=200) return "unhealthy";
+  if (aqi<=300) return "veryunhealthy";
+  return "hazardous";
+}
+const BAND_COLOR = { good:"#4FD1B8", moderate:"#E8C25A", usg:"#E89B4C", unhealthy:"#E1615E", veryunhealthy:"#A667C9", hazardous:"#B0466B" };
+const BAND_I18N_KEY = { good:"bandGood", moderate:"bandModerate", usg:"bandUsg", unhealthy:"bandUnhealthy", veryunhealthy:"bandVeryUnhealthy", hazardous:"bandHazardous" };
+function bandLabel(b){ return b ? I18N[state.lang][BAND_I18N_KEY[b]] : I18N[state.lang].noKey; }
+function radiusFor(aqi){ if(aqi==null) return 6; return Math.max(6, Math.min(22, 6 + aqi/16)); }
+
+/* ---------------- Map setup ---------------- */
+let map, tileLayer;
+const TILES = {
+  dark:  { url:"https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", attribution:'&copy; OpenStreetMap contributors &copy; CARTO' },
+  light: { url:"https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", attribution:'&copy; OpenStreetMap contributors &copy; CARTO' }
+};
+
+function initMap(){
+  map = L.map('leafletMap', { worldCopyJump:true, minZoom:1.5 }).setView([15, 20], 2);
+  tileLayer = L.tileLayer(TILES[state.theme].url, { attribution:TILES[state.theme].attribution, maxZoom:19 }).addTo(map);
+
+  CITIES.forEach(city=>{
+    const marker = L.circleMarker([city.lat, city.lon], {
+      radius:6, weight:1.5, color:"rgba(255,255,255,0.5)", fillColor:"#888", fillOpacity:0.6
+    }).addTo(map);
+    marker.bindPopup(popupHtml(city, null));
+    state.markers[city.id] = marker;
+  });
+}
+
+function popupHtml(city, res){
+  const t = I18N[state.lang];
+  const cityName = city.name[state.lang];
+  if (!res || res.status==="loading"){
+    return `<div class="popup-city">${cityName}</div><div class="popup-meta">${t.loading}</div>`;
+  }
+  if (res.status==="error" || res.aqi==null){
+    return `<div class="popup-city">${cityName}</div><div class="popup-meta">${t.error}</div>`;
+  }
+  const b = band(res.aqi);
+  return `<div class="popup-city">${cityName}</div>
+    <div class="popup-aqi" style="color:${BAND_COLOR[b]}">${res.aqi}</div>
+    <div class="popup-band" style="color:${BAND_COLOR[b]}">${bandLabel(b)}</div>
+    <div class="popup-meta">${t.updated}: ${res.ts ? new Date(res.ts).toLocaleTimeString() : "—"}</div>`;
+}
+
+function updateMarker(city, res){
+  const marker = state.markers[city.id];
+  if (!marker) return;
+  if (res && res.aqi!=null){
+    const b = band(res.aqi);
+    marker.setStyle({ fillColor: BAND_COLOR[b], fillOpacity:0.85, color:"rgba(255,255,255,0.65)" });
+    marker.setRadius(radiusFor(res.aqi));
+  }
+  marker.setPopupContent(popupHtml(city, res));
+}
+
+/* ---------------- Continent cards ---------------- */
+function renderContinentCards(){
+  const t = I18N[state.lang];
+  const grid = document.getElementById('continentGrid');
+  grid.innerHTML = "";
+  CONTINENT_ORDER.forEach(cont=>{
+    const rep = CITIES.find(c=>c.continent===cont && c.rep);
+    const res = state.results[rep.id];
+    const aqi = res && res.aqi!=null ? res.aqi : null;
+    const b = band(aqi);
+    const color = b ? BAND_COLOR[b] : "#7E8B98";
+    const pct = aqi!=null ? Math.min(100, aqi/3.5) : 0;
+    const stationsCount = CITIES.filter(c=>c.continent===cont).length;
+
+    const card = document.createElement('div');
+    card.className = "card";
+    card.tabIndex = 0;
+    card.innerHTML = `
+      <div class="card-top">
+        <div>
+          <div class="continent-name">${CONTINENT_NAME[cont][state.lang]}</div>
+          <div class="continent-city">${t.updated==="Updated"?"Rep.: ":(state.lang==='zh'?'代表：':'ตัวแทน: ')}${rep.name[state.lang]}</div>
+        </div>
+        <div class="band-pill" style="background:${color}2e; color:${color};">${b ? bandLabel(b) : t.noKey}</div>
+      </div>
+      <div class="aqi-num ${aqi==null?'skeleton':''}" style="color:${color};">${aqi!=null ? aqi : (res && res.status==='error' ? '—' : '···')}</div>
+      <div class="aqi-unit">US AQI · IQAir</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%; background:${color};"></div></div>
+      <div class="card-foot"><span>${stationsCount} ${t.stations}</span><span>${res && res.ts ? new Date(res.ts).toLocaleTimeString() : ''}</span></div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+/* ---------------- Fetch from IQAir ---------------- */
+async function fetchCity(city){
+  if (!state.apiKey){
+    state.results[city.id] = { status:"nokey" };
+    return;
+  }
+  state.results[city.id] = { status:"loading" };
+  updateMarker(city, state.results[city.id]);
+  try{
+    const url = `https://api.airvisual.com/v2/nearest_city?lat=${city.lat}&lon=${city.lon}&key=${encodeURIComponent(state.apiKey)}`;
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if (data.status === "success"){
+      const aqi = data.data.current.pollution.aqius;
+      const ts = data.data.current.pollution.ts;
+      state.results[city.id] = { status:"ok", aqi, ts };
+    } else {
+      state.results[city.id] = { status:"error", message: data.data && data.data.message };
+    }
+  }catch(e){
+    state.results[city.id] = { status:"error", message: String(e) };
+  }
+  updateMarker(city, state.results[city.id]);
+  refreshTopStats();
+  renderContinentCards();
+}
+
+function refreshTopStats(){
+  const vals = CITIES.map(c=>state.results[c.id]).filter(r=>r && r.aqi!=null).map(r=>r.aqi);
+  const globalAvg = document.getElementById('globalAvg');
+  const statDanger = document.getElementById('statDanger');
+  if (vals.length===0){ globalAvg.textContent = "—"; statDanger.textContent = "—"; return; }
+  const avg = Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
+  globalAvg.textContent = avg;
+  statDanger.textContent = vals.filter(v=>v>150).length;
+}
+
+async function fetchAll(){
+  const btn = document.getElementById('refreshBtn');
+  if (!state.apiKey){
+    document.getElementById('keyStatus').innerHTML =
+      `${I18N[state.lang].needKey}<a href="https://www.iqair.com/dashboard/api" target="_blank" rel="noopener">${I18N[state.lang].getKeyLink}</a>`;
+    CITIES.forEach(c=>{ state.results[c.id] = { status:"nokey" }; updateMarker(c, state.results[c.id]); });
+    renderContinentCards();
+    refreshTopStats();
+    return;
+  }
+  btn.disabled = true;
+  // stagger requests to stay well under the API's rate limit
+  for (let i=0;i<CITIES.length;i++){
+    await fetchCity(CITIES[i]);
+    await new Promise(r=>setTimeout(r, 350));
+  }
+  btn.disabled = false;
+}
+
+/* ---------------- i18n render ---------------- */
+function renderLanguage(){
+  const t = I18N[state.lang];
+  document.body.setAttribute('data-lang', state.lang);
+  document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent = t[el.getAttribute('data-i18n')]; });
+  document.querySelectorAll('[data-i18n-html]').forEach(el=>{ el.innerHTML = t[el.getAttribute('data-i18n-html')]; });
+  document.querySelectorAll('.langsw button').forEach(b=>b.classList.toggle('active', b.dataset.langBtn===state.lang));
+  document.getElementById('apiKeyInput').placeholder = "IQAir API key";
+  Object.entries(state.markers).forEach(([id, marker])=>{
+    const city = CITIES.find(c=>c.id===id);
+    marker.setPopupContent(popupHtml(city, state.results[id]));
+  });
+  if (!state.apiKey){
+    document.getElementById('keyStatus').innerHTML =
+      `${t.needKey}<a href="https://www.iqair.com/dashboard/api" target="_blank" rel="noopener">${t.getKeyLink}</a>`;
+  }
+  renderContinentCards();
+}
+
+/* ---------------- Theme ---------------- */
+function applyTheme(){
+  document.body.setAttribute('data-theme', state.theme);
+  if (tileLayer){
+    map.removeLayer(tileLayer);
+    tileLayer = L.tileLayer(TILES[state.theme].url, { attribution:TILES[state.theme].attribution, maxZoom:19 }).addTo(map);
+  }
+}
+
+/* ---------------- Wire up ---------------- */
+document.getElementById('themeToggle').addEventListener('click', ()=>{
+  state.theme = state.theme === "dark" ? "light" : "dark";
+  applyTheme();
+});
+document.querySelectorAll('.langsw button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{ state.lang = btn.dataset.langBtn; renderLanguage(); });
+});
+document.getElementById('apiKeySave').addEventListener('click', ()=>{
+  const val = document.getElementById('apiKeyInput').value.trim();
+  state.apiKey = val;
+  document.getElementById('keyStatus').textContent = val ? I18N[state.lang].keyOk : "";
+  fetchAll();
+});
+document.getElementById('refreshBtn').addEventListener('click', fetchAll);
+
+/* ---------------- Init ---------------- */
+initMap();
+renderLanguage();
+renderContinentCards();
+</script>
+</body>
+</html>
