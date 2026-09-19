@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="th" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<title>AEROGRID — แผนที่ความหนาแน่นคุณภาพอากาศโลก (Live)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root{
+    --c-good:#4FD1B8; --c-moderate:#E8C25A; --c-usg:#E89B4C;
+    --c-unhealthy:#E1615E; --c-veryunhealthy:#A667C9; --c-hazardous:#B0466B;
+    --accent:#E89B4C;
+  }
+  :root[data-theme="dark"]{
+    --bg:#090c11; --panel:#0f141b; --panel2:#131a22; --text:#E7EEF3; --dim:#7E8B98; --faint:#5A6672;
+    --line:rgba(180,200,220,.10); --input:#0c1119;
+    --bg-panel:#0f141b; --bg-panel-2:#131a22; --text-dim:#7E8B98; --text-faint:#4A5560; --hairline:rgba(180,200,220,.10); --input-bg:#0c1119;
+  }
+  :root[data-theme="light"]{
+    --bg:#F1F4F7; --panel:#FFFFFF; --panel2:#F7F9FB; --text:#101820; --dim:#5B6773; --faint:#7C8894;
+    --line:rgba(10,25,40,.10); --input:#FFFFFF;
+    --bg-panel:#FFFFFF; --bg-panel-2:#F7F9FB; --text-dim:#5B6773; --text-faint:#93A0AB; --hairline:rgba(10,25,40,.09); --input-bg:#FFFFFF;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans Thai','Noto Sans SC',sans-serif;-webkit-font-smoothing:antialiased;transition:background .25s,color .25s}
+  body[data-lang="zh"]{font-family:'Noto Sans SC','IBM Plex Sans Thai',sans-serif}
+  .mono{font-family:'IBM Plex Mono',monospace}
+  .disp{font-family:'Space Grotesk','IBM Plex Sans Thai',sans-serif}
+  button,input,select{font:inherit;color:inherit}
+  button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+  .tabs{display:flex;gap:4px}
+  .tab{background:none;border:0;padding:8px 14px;border-radius:8px;color:var(--dim);cursor:pointer}
+  .tab:hover{color:var(--text);background:var(--panel2)}
+  .tab.on{color:var(--text);background:var(--panel2);box-shadow:inset 0 -2px 0 var(--accent)}
+  .nav-r{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .chip{font-family:'IBM Plex Mono',monospace;font-size:11px;padding:4px 9px;border-radius:20px;border:1px solid var(--line);color:var(--dim)}
+  .chip.live{color:var(--c-good);border-color:rgba(79,209,184,.4)}
+  .chip.mock{color:var(--c-moderate);border-color:rgba(232,194,90,.4)}
+  .seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .seg button{background:none;border:0;padding:7px 11px;color:var(--dim);cursor:pointer;font-size:12px}
+  .seg button.on{background:var(--accent);color:#0a0a0a;font-weight:600}
+  .seg button:not(.on):hover{background:var(--panel2);color:var(--text)}
+  .seg button:disabled{opacity:.4;cursor:not-allowed}
+  .icon-btn{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:var(--panel);cursor:pointer;display:grid;place-items:center;color:var(--dim)}
+  .icon-btn:hover{color:var(--text);border-color:var(--accent)}
+  .icon-btn svg{width:16px;height:16px}
+
+  main{max-width:1280px;margin:0 auto;padding:28px 32px 60px}
+  #consoleView h1{font-family:'Space Grotesk','IBM Plex Sans Thai',sans-serif;font-size:clamp(24px,3vw,32px);font-weight:600;margin:0 0 6px;letter-spacing:-.01em}
+  #consoleView h2,#settings h2{font-family:'Space Grotesk','IBM Plex Sans Thai',sans-serif;font-size:18px;font-weight:600;margin:0}
+  #consoleView .sub{color:var(--dim);font-size:14px;margin:0 0 24px;max-width:62ch;line-height:1.6}
+
+  .btn{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 14px;cursor:pointer;font-size:13px}
+  .btn:hover{border-color:var(--accent)}
+  .btn.pri{background:var(--accent);color:#0a0a0a;border-color:var(--accent);font-weight:600}
+  .btn.danger{color:var(--c-unhealthy)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  #consoleView input,#consoleView select,#settings input,#settings select{background:var(--input);border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-size:13.5px;width:100%}
+  #consoleView label,#settings label{display:block;font-size:12px;color:var(--dim);margin-bottom:5px}
+  .row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+  .row>div{flex:1;min-width:150px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px}
+
+  /* login */
+  .login-wrap{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center;min-height:60vh}
+  @media(max-width:860px){.login-wrap{grid-template-columns:1fr}}
+  .login-wrap h1{font-size:clamp(28px,4vw,42px);line-height:1.15}
+  .field{margin-bottom:14px}
+  .demo{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .hint{font-size:12px;color:var(--faint);line-height:1.6;margin-top:10px}
+
+  /* stats */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:22px}
+  @media(max-width:820px){.stats{grid-template-columns:repeat(2,1fr)}}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .kpi b{display:block;font-family:'IBM Plex Mono',monospace;font-size:28px;font-weight:600;line-height:1.1}
+  .kpi span{font-size:12px;color:var(--dim)}
+
+  .banner{border:1px solid rgba(225,97,94,.45);background:rgba(225,97,94,.08);border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:18px;color:var(--text)}
+  .note{border:1px dashed var(--line);border-radius:10px;padding:10px 14px;font-size:12.5px;color:var(--dim);margin-bottom:18px;line-height:1.6}
+
+  /* device cards */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px}
+  .dev{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:14px}
+  .dev.off{opacity:.7}
+  .dev-top{display:flex;justify-content:space-between;gap:10px}
+  .dev-name{font-family:'Space Grotesk','IBM Plex Sans Thai',sans-serif;font-weight:600;font-size:16px}
+  .dev-loc{font-size:12px;color:var(--faint);margin-top:2px}
+  .pill{font-family:'IBM Plex Mono',monospace;font-size:10.5px;padding:3px 8px;border-radius:20px;font-weight:600;white-space:nowrap;height:fit-content}
+  .aqi-row{display:flex;align-items:flex-end;justify-content:space-between;gap:10px}
+  .aqi{font-family:'IBM Plex Mono',monospace;font-size:44px;font-weight:600;line-height:1}
+  .aqi-l{font-size:11.5px;color:var(--faint);margin-top:6px}
+  .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .metric{background:var(--panel2);border-radius:8px;padding:8px 10px}
+  .metric b{display:block;font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:500}
+  .metric span{font-size:10.5px;color:var(--faint)}
+  .ctl{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+  .ctl>span{font-size:12px;color:var(--dim)}
+  .switch{width:44px;height:24px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);position:relative;cursor:pointer;padding:0;transition:.2s}
+  .switch::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--dim);transition:.2s}
+  .switch.on{background:var(--c-good);border-color:var(--c-good)}
+  .switch.on::after{left:22px;background:#06201b}
+  .switch:disabled{opacity:.4;cursor:not-allowed}
+  .dev select{width:auto;padding:5px 8px;font-size:12px}
+  details{font-size:12px;color:var(--dim)}
+  summary{cursor:pointer;padding:2px 0}
+  pre{background:var(--input);border:1px solid var(--line);border-radius:8px;padding:10px;overflow:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;margin:6px 0 0;max-height:180px;color:var(--text)}
+
+  /* tables */
+  .table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+  table{border-collapse:collapse;width:100%;font-size:13px;min-width:640px}
+  th{text-align:left;font-weight:500;color:var(--dim);font-size:12px;padding:12px 14px;border-bottom:1px solid var(--line)}
+  td{padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+  tr:last-child td{border-bottom:0}
+  td select{padding:6px 8px;font-size:12.5px;min-width:150px}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+  .sec-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:26px 0 12px;flex-wrap:wrap}
+  .empty{padding:30px;text-align:center;color:var(--dim);font-size:14px}
+
+  dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:14px;padding:24px;width:min(560px,92vw);max-height:88vh}
+  dialog::backdrop{background:rgba(0,0,0,.55)}
+  dialog h2{margin-bottom:14px}
+  .radio{display:flex;gap:8px;margin-bottom:14px}
+  .radio button{flex:1;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);cursor:pointer;text-align:left}
+  .radio button.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+  .radio small{display:block;color:var(--faint);font-size:11px;margin-top:2px}
+  .contract{font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.7;color:var(--dim);background:var(--input);border:1px solid var(--line);border-radius:8px;padding:10px;margin:12px 0}
+  .msg{font-size:12.5px;margin-top:8px;min-height:18px}
+  #toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:10px 18px;border-radius:8px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:50;max-width:90vw}
+  #toast.show{opacity:1}
+  @media(max-width:600px){main{padding:20px 16px 50px}}
+
+  body{overflow-x:hidden}
+  ::selection{background:var(--c-usg); color:#0a0a0a;}
+  a{color:inherit;}
+
+  /* ---------- shared nav ---------- */
+  nav{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:16px 40px; border-bottom:1px solid var(--hairline); background:transparent;
+    position:relative; z-index:20; gap:14px; flex-wrap:wrap;
+  }
+  @media (max-width:600px){ nav{padding:12px 16px;} }
+  .brand{ display:flex; align-items:center; gap:10px; font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:18px; background:none; border:0; padding:0; color:inherit; cursor:pointer; }
+  .brand-mark{ width:10px; height:10px; border-radius:50%; background:var(--c-usg);
+    box-shadow:0 0 0 3px rgba(232,155,76,0.15); animation: mark-pulse 2.6s ease-in-out infinite; flex-shrink:0;}
+  @keyframes mark-pulse{ 0%,100%{box-shadow:0 0 0 3px rgba(232,155,76,0.15);} 50%{box-shadow:0 0 0 7px rgba(232,155,76,0.03);} }
+  .nav-right{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .langsw{ display:flex; border:1px solid var(--hairline); border-radius:8px; overflow:hidden; }
+  .langsw button{ background:none; border:none; color:var(--text-dim); font-family:'IBM Plex Mono',monospace; font-size:12px; padding:8px 12px; cursor:pointer; transition:.15s; }
+  .langsw button.active{ background:var(--c-usg); color:#0a0a0a; font-weight:600; }
+  .langsw button:not(.active):hover{ color:var(--text); background:var(--bg-panel-2); }
+  .user-name{ font-size:13px; color:var(--text-dim); max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  /* ---------- public home (unchanged design) ---------- */
+  .hero{ position:relative; padding:48px 40px 20px; max-width:1360px; margin:0 auto; }
+  @media (max-width:600px){ .hero{padding:32px 16px 16px;} }
+  .eyebrow{ font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.14em; text-transform:uppercase; color:var(--c-usg); display:flex; align-items:center; gap:10px; margin-bottom:18px; }
+  .eyebrow::before{ content:''; width:22px; height:1px; background:var(--c-usg); opacity:.6; }
+  .hero-grid{ display:grid; grid-template-columns:1.05fr 0.95fr; gap:40px; align-items:end; }
+  @media (max-width:980px){ .hero-grid{grid-template-columns:1fr;} }
+  .hero h1{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:clamp(28px,4vw,48px); line-height:1.08; letter-spacing:-0.01em; margin:0 0 16px; }
+  body[data-lang="zh"] .hero h1{ font-family:'Noto Sans SC','Space Grotesk',sans-serif; }
+  .hero h1 em{ font-style:normal; background:linear-gradient(90deg, var(--c-usg), var(--c-unhealthy)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .hero-sub{ color:var(--text-dim); font-size:15.5px; line-height:1.65; max-width:48ch; margin:0 0 24px; }
+  .hero-stat-row{ display:flex; gap:32px; flex-wrap:wrap; }
+  .stat-num{ font-family:'IBM Plex Mono',monospace; font-size:30px; font-weight:600; }
+  .stat-label{ font-size:11.5px; color:var(--text-faint); margin-top:4px; max-width:16ch; }
+
+  .map-panel{ background:var(--bg-panel); border:1px solid var(--hairline); border-radius:14px; padding:14px; position:relative; }
+  .map-panel-head{ display:flex; justify-content:space-between; align-items:center; padding:2px 6px 12px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--text-faint); letter-spacing:.06em; text-transform:uppercase; gap:10px; flex-wrap:wrap;}
+  .live-dot{ width:6px; height:6px; border-radius:50%; background:var(--c-good); display:inline-block; margin-right:6px; animation: live 1.8s ease-in-out infinite; }
+  @keyframes live{ 0%,100%{opacity:1;} 50%{opacity:.25;} }
+  .refresh-btn{ font-family:'IBM Plex Mono',monospace; font-size:11px; padding:6px 10px; border-radius:6px; border:1px solid var(--hairline); background:var(--bg-panel-2); color:var(--text); cursor:pointer; }
+  .refresh-btn:hover{ border-color:var(--c-usg); }
+  .refresh-btn:disabled{ opacity:.5; cursor:default; }
+  #leafletMap{ width:100%; height:420px; border-radius:10px; overflow:hidden; }
+  .leaflet-popup-content-wrapper{ background:var(--bg-panel); color:var(--text); border-radius:8px; }
+  .leaflet-popup-tip{ background:var(--bg-panel); }
+  .popup-city{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:14px; margin-bottom:2px; }
+  .popup-aqi{ font-family:'IBM Plex Mono',monospace; font-size:22px; font-weight:600; }
+  .popup-band{ font-size:11px; margin-top:2px; }
+  .popup-meta{ font-size:10.5px; color:var(--text-faint); margin-top:6px; }
+
+  .key-panel{ display:flex; gap:8px; align-items:center; padding:10px 6px 4px; flex-wrap:wrap; font-size:12px; color:var(--text-dim); }
+  .key-panel input{ background:var(--input-bg); border:1px solid var(--hairline); color:var(--text); border-radius:6px; padding:8px 10px; font-family:'IBM Plex Mono',monospace; font-size:12px; flex:1; min-width:180px; }
+  .key-panel button{ font-family:'IBM Plex Mono',monospace; font-size:11px; padding:8px 12px; border-radius:6px; border:1px solid var(--hairline); background:var(--c-usg); color:#0a0a0a; cursor:pointer; font-weight:600; }
+  .key-status{ font-size:11px; color:var(--text-faint); padding:0 6px 6px; }
+  .key-status a{ color:var(--c-usg); text-decoration:underline; }
+
+  .legend-strip{ max-width:1360px; margin:0 auto; padding:24px 40px 8px; display:flex; flex-wrap:wrap; gap:20px; align-items:center; border-bottom:1px solid var(--hairline); }
+  .legend-item{ display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-dim); }
+  .legend-swatch{ width:9px; height:9px; border-radius:2px; flex-shrink:0; }
+  .legend-title{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--text-faint); text-transform:uppercase; letter-spacing:.1em; margin-right:4px; }
+
+  .section{ max-width:1360px; margin:0 auto; padding:48px 40px 30px; }
+  .section-head{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:24px; gap:20px; flex-wrap:wrap; }
+  .section-title{ font-family:'Space Grotesk',sans-serif; font-size:21px; font-weight:600; }
+  .section-note{ font-size:13px; color:var(--text-faint); max-width:38ch; }
+  .cgrid{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+  @media (max-width:920px){ .cgrid{grid-template-columns:repeat(2,1fr);} }
+  @media (max-width:600px){ .cgrid{grid-template-columns:1fr;} }
+  .card{ background:var(--bg-panel); border:1px solid var(--hairline); border-radius:12px; padding:20px 20px 18px; position:relative; transition:border-color .2s, transform .2s; }
+  .card:hover{ border-color:rgba(150,160,170,0.35); transform:translateY(-2px); }
+  .card:focus-visible{ outline:2px solid var(--c-usg); outline-offset:2px; }
+  .card-top{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px;}
+  .continent-name{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:16px; }
+  .continent-city{ font-size:12px; color:var(--text-faint); margin-top:2px; }
+  .band-pill{ font-family:'IBM Plex Mono',monospace; font-size:10px; padding:3px 8px; border-radius:20px; white-space:nowrap; font-weight:600; }
+  .aqi-num{ font-family:'IBM Plex Mono',monospace; font-size:36px; font-weight:600; line-height:1; }
+  .aqi-unit{ font-size:11px; color:var(--text-faint); margin-top:6px; }
+  .bar-track{ height:5px; border-radius:3px; background:rgba(140,150,160,0.16); margin-top:16px; overflow:hidden; }
+  .bar-fill{ height:100%; border-radius:3px; transition:width .5s ease; }
+  .card-foot{ display:flex; justify-content:space-between; margin-top:12px; font-size:11px; color:var(--text-faint); }
+  .skeleton{ opacity:.45; }
+  footer{ max-width:1360px; margin:0 auto; padding:30px 40px 60px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:14px; color:var(--text-faint); font-size:12px; border-top:1px solid var(--hairline); }
+  .disclosure{ max-width:1360px; margin:0 auto; padding:0 40px; font-size:11.5px; color:var(--text-faint); line-height:1.6; }
+  #consoleView h1{ font-size:clamp(24px,3vw,32px); margin:0 0 6px; line-height:1.15; }
+  #consoleView .login-wrap h1{ font-size:clamp(28px,4vw,42px); }
+</style>
+</head>
+<body data-lang="th">
+<nav id="nav"></nav>
+<div id="homeView">
+<div class="hero" id="map">
+  <div class="eyebrow" data-i18n="eyebrow">Live Air Density Index</div>
+  <div class="hero-grid">
+    <div>
+      <h1 data-i18n-html="h1"></h1>
+      <p class="hero-sub" data-i18n="sub"></p>
+      <div class="hero-stat-row">
+        <div class="stat"><div class="stat-num mono" style="color:var(--c-usg);" id="globalAvg">—</div><div class="stat-label" data-i18n="statAvg"></div></div>
+        <div class="stat"><div class="stat-num mono" id="statCities">14</div><div class="stat-label" data-i18n="statCities"></div></div>
+        <div class="stat"><div class="stat-num mono" style="color:var(--c-unhealthy);" id="statDanger">—</div><div class="stat-label" data-i18n="statDanger"></div></div>
+      </div>
+    </div>
+
+    <div class="map-panel">
+      <div class="map-panel-head">
+        <span><span class="live-dot"></span><span data-i18n="scanning"></span></span>
+        <button class="refresh-btn" id="refreshBtn" data-i18n="refresh"></button>
+      </div>
+      <div id="leafletMap"></div>
+      <div id="keyWrap">
+        <div class="key-panel">
+          <span data-i18n="apiKeyLabel"></span>
+          <input type="text" id="apiKeyInput" placeholder="WAQI API token" autocomplete="off" spellcheck="false">
+          <button id="apiKeySave" data-i18n="save"></button>
+        </div>
+        <div class="key-status" id="keyStatus"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="legend-strip" id="legend">
+  <span class="legend-title" data-i18n="legendTitle"></span>
+  <div class="legend-item"><span class="legend-swatch" style="background:#4FD1B8;"></span><span data-i18n="bandGood"></span> 0–50</div>
+  <div class="legend-item"><span class="legend-swatch" style="background:#E8C25A;"></span><span data-i18n="bandModerate"></span> 51–100</div>
+  <div class="legend-item"><span class="legend-swatch" style="background:#E89B4C;"></span><span data-i18n="bandUsg"></span> 101–150</div>
+  <div class="legend-item"><span class="legend-swatch" style="background:#E1615E;"></span><span data-i18n="bandUnhealthy"></span> 151–200</div>
+  <div class="legend-item"><span class="legend-swatch" style="background:#A667C9;"></span><span data-i18n="bandVeryUnhealthy"></span> 201–300</div>
+  <div class="legend-item"><span class="legend-swatch" style="background:#B0466B;"></span><span data-i18n="bandHazardous"></span> 300+</div>
+</div>
+
+<div class="section" id="continents">
+  <div class="section-head">
+    <div class="section-title" data-i18n="sectionTitle"></div>
+    <div class="section-note" data-i18n="sectionNote"></div>
+  </div>
+  <div class="cgrid" id="continentGrid"></div>
+</div>
+
+<p class="disclosure" id="about" data-i18n-html="disclosure"></p>
+
+<footer>
+  <div data-i18n="footerLeft"></div>
+  <div data-i18n="footerRight"></div>
+</footer>
+</div>
+
+<div id="consoleView" hidden></div>
+<dialog id="settings"></dialog>
+<div id="toast" role="status" aria-live="polite"></div>
+<script>
+/* =====================================================================
+   CONFIG — ปรับตรงนี้ที่เดียวเมื่อต่อ API จริง
+   ===================================================================== */
+const CFG = {
+  waqiToken: '',               // (ทางเลือก) WAQI token แบบอ่านอย่างเดียว ใส่ไว้เพื่อให้ผู้เยี่ยมชมเห็นแผนที่ทันทีโดยไม่ต้องกรอกเอง
+  showSettings: true,           // แสดงปุ่มเฟืองตั้งค่าการเชื่อมต่อ (ปิดเป็น false เมื่อขึ้นระบบจริง)
+  defaultMode: 'mock',          // 'mock' = ข้อมูลจำลอง | 'live' = เรียก Backend จริง
+  apiBase: '/api',              // URL ของ Backend ของคุณ (ตัวอย่าง https://api.yourdomain.com/api)
+  pollMs: 5000,                 // ความถี่ดึงสถานะอุปกรณ์
+  historyPoints: 30,            // จำนวนจุดกราฟ PM2.5 ที่เก็บในเบราว์เซอร์
+
+  // ชื่อ code ของ Tuya ที่จะลองหา (ตัวแรกที่เจอในอุปกรณ์จะถูกใช้ทั้งอ่านค่าและส่งคำสั่ง)
+  // ดูชื่อจริงได้จาก "ข้อมูลดิบ" ในการ์ดอุปกรณ์ แล้วเพิ่มชื่อลงในรายการนี้
+  codes: {
+    power: ['switch', 'switch_1', 'power'],
+    pm25:  ['pm25', 'pm25_value', 'pm2_5', 'pm25_current'],
+    co2:   ['co2_value', 'co2', 'co2_current'],
+    temp:  ['temp_current', 'va_temperature', 'temp_indoor', 'temperature'],
+    hum:   ['humidity_value', 'va_humidity', 'humidity_current', 'humidity'],
+    fan:   ['fan_speed_enum', 'speed', 'fan_speed', 'level'],
+    mode:  ['mode', 'work_mode']
+  },
+  // ตัวคูณปรับสเกลต่อ code (เช่น Tuya ส่งอุณหภูมิเป็น 253 = 25.3°C → 0.1)
+  scale: { va_temperature: 0.1 },
+  // ค่าที่ให้เลือกในหน้าควบคุม (ต้องตรงกับ enum ของอุปกรณ์)
+  fanOptions:  ['auto', 'low', 'mid', 'high'],
+  modeOptions: ['auto', 'manual', 'sleep']
+};
+
+/* =====================================================================
+   i18n
+   ===================================================================== */
+const T = {
+  th:{ dash:'อุปกรณ์ของฉัน', home:'แผนที่โลก', backHome:'กลับหน้าแรก', admin:'ผู้ดูแลระบบ', logout:'ออกจากระบบ', signin:'เข้าสู่ระบบ', email:'อีเมล', password:'รหัสผ่าน',
+    loginTitle:'ควบคุมอากาศในบ้านคุณ จากที่ไหนก็ได้', loginSub:'เข้าสู่ระบบเพื่อดูค่าฝุ่น PM2.5 และสั่งงานเครื่องฟอกอากาศที่ผูกกับบัญชีของคุณ',
+    demoHint:'โหมดข้อมูลจำลอง: กดเพื่อกรอกบัญชีทดลอง', demoAdmin:'แอดมิน', demoUser:'ลูกค้า',
+    hello:'สวัสดี', myDevices:'อุปกรณ์ของฉัน', allDevices:'อุปกรณ์ทั้งระบบ', dashSub:'ข้อมูลอัปเดตอัตโนมัติทุกไม่กี่วินาที',
+    total:'อุปกรณ์ทั้งหมด', onlineN:'ออนไลน์', avgPm:'PM2.5 เฉลี่ย (µg/m³)', alertsN:'เกินเกณฑ์',
+    online:'ออนไลน์', offline:'ออฟไลน์', power:'เปิดเครื่อง', fan:'ความแรงพัดลม', mode:'โหมด',
+    pm25:'PM2.5', co2:'CO₂', temp:'อุณหภูมิ', hum:'ความชื้น', alertAt:'แจ้งเตือนเมื่อ AQI เกิน',
+    raw:'ข้อมูลดิบจาก Tuya', noData:'ยังไม่มีข้อมูล', noDevices:'ยังไม่มีอุปกรณ์ในบัญชีนี้ กรอกรหัสอุปกรณ์ด้านล่างเพื่อผูกเครื่องเข้ากับบัญชี',
+    claimTitle:'ผูกอุปกรณ์เข้าบัญชี', claimLabel:'รหัสอุปกรณ์ (Device ID)', claimBtn:'ผูกอุปกรณ์', claimMock:'ทดลองในโหมดจำลอง: กรอก tuya_new_0001',
+    refresh:'รีเฟรช', settings:'ตั้งค่าการเชื่อมต่อ', save:'บันทึก', close:'ปิด', test:'ทดสอบการเชื่อมต่อ',
+    modeMock:'ข้อมูลจำลอง', modeMockD:'ทดลองใช้โดยไม่ต้องมี Backend', modeLive:'API จริง', modeLiveD:'เรียก Backend ของคุณ',
+    apiBase:'Base URL ของ Backend', poll:'ดึงข้อมูลทุก (วินาที)', contract:'รูปแบบ API ที่ Backend ต้องมี',
+    addDevice:'เพิ่มอุปกรณ์', devId:'Device ID', devName:'ชื่ออุปกรณ์', devLoc:'สถานที่', owner:'เจ้าของ', unassigned:'— ยังไม่มีเจ้าของ —',
+    devices:'อุปกรณ์', users:'ผู้ใช้', audit:'บันทึกการสั่งงาน', time:'เวลา', user:'ผู้ใช้', action:'การกระทำ', device:'อุปกรณ์',
+    status:'สถานะ', del:'ลบ', addUser:'เพิ่มผู้ใช้', name:'ชื่อ', role:'สิทธิ์', devCount:'จำนวนเครื่อง',
+    mockBanner:'กำลังใช้ข้อมูลจำลอง — เปลี่ยนเป็น API จริงได้ที่ปุ่มตั้งค่า (ไอคอนเฟือง)',
+    sent:'ส่งคำสั่งแล้ว', saved:'บันทึกแล้ว', failed:'ไม่สำเร็จ', confirmDel:'ลบอุปกรณ์นี้ออกจากระบบ?', assigned:'ผูกเจ้าของแล้ว',
+    alertBanner:'AQI เกินเกณฑ์ที่ตั้งไว้:', tested:'เชื่อมต่อได้', loginFail:'เข้าสู่ระบบไม่สำเร็จ',
+    f_auto:'อัตโนมัติ', f_low:'ต่ำ', f_mid:'กลาง', f_high:'สูง', f_sleep:'หลับ', f_manual:'ปกติ',
+    bGood:'ดี', bMod:'ปานกลาง', bUsg:'เสี่ยงในกลุ่มเปราะบาง', bUnh:'ไม่ดีต่อสุขภาพ', bVun:'อันตรายมาก', bHaz:'อันตรายร้ายแรง',
+    roleAdmin:'แอดมิน', roleUser:'ลูกค้า', devHelp:'ผูกเจ้าของเครื่องได้จากคอลัมน์ "เจ้าของ" — ลูกค้าจะเห็นเฉพาะเครื่องของตัวเอง' },
+  en:{ dash:'My devices', home:'World map', backHome:'Back to home', admin:'Admin', logout:'Sign out', signin:'Sign in', email:'Email', password:'Password',
+    loginTitle:'Control the air in your home, from anywhere', loginSub:'Sign in to see PM2.5 readings and control the air purifiers linked to your account.',
+    demoHint:'Mock mode: tap to fill a demo account', demoAdmin:'Admin', demoUser:'Customer',
+    hello:'Hello', myDevices:'My devices', allDevices:'All devices', dashSub:'Readings refresh automatically every few seconds',
+    total:'Total devices', onlineN:'Online', avgPm:'Avg PM2.5 (µg/m³)', alertsN:'Over threshold',
+    online:'Online', offline:'Offline', power:'Power', fan:'Fan speed', mode:'Mode',
+    pm25:'PM2.5', co2:'CO₂', temp:'Temp', hum:'Humidity', alertAt:'Alert when AQI exceeds',
+    raw:'Raw Tuya data', noData:'No data yet', noDevices:'No devices on this account yet. Enter a device ID below to link one.',
+    claimTitle:'Link a device to your account', claimLabel:'Device ID', claimBtn:'Link device', claimMock:'Mock mode: try tuya_new_0001',
+    refresh:'Refresh', settings:'Connection settings', save:'Save', close:'Close', test:'Test connection',
+    modeMock:'Mock data', modeMockD:'Try it without a backend', modeLive:'Live API', modeLiveD:'Call your backend',
+    apiBase:'Backend base URL', poll:'Poll every (seconds)', contract:'API your backend needs to provide',
+    addDevice:'Add device', devId:'Device ID', devName:'Device name', devLoc:'Location', owner:'Owner', unassigned:'— No owner —',
+    devices:'Devices', users:'Users', audit:'Command log', time:'Time', user:'User', action:'Action', device:'Device',
+    status:'Status', del:'Delete', addUser:'Add user', name:'Name', role:'Role', devCount:'Devices',
+    mockBanner:'Using mock data. Switch to your live API with the gear button.',
+    sent:'Command sent', saved:'Saved', failed:'Failed', confirmDel:'Remove this device from the system?', assigned:'Owner updated',
+    alertBanner:'AQI over your threshold:', tested:'Connected', loginFail:'Sign-in failed',
+    f_auto:'Auto', f_low:'Low', f_mid:'Medium', f_high:'High', f_sleep:'Sleep', f_manual:'Manual',
+    bGood:'Good', bMod:'Moderate', bUsg:'Unhealthy for sensitive groups', bUnh:'Unhealthy', bVun:'Very unhealthy', bHaz:'Hazardous',
+    roleAdmin:'Admin', roleUser:'Customer', devHelp:'Assign owners in the Owner column. Customers only see their own devices.' },
+  zh:{ dash:'我的设备', home:'世界地图', backHome:'返回首页', admin:'管理员', logout:'退出登录', signin:'登录', email:'邮箱', password:'密码',
+    loginTitle:'随时随地掌控家中的空气', loginSub:'登录后查看 PM2.5 数据并控制绑定到您账户的空气净化器。',
+    demoHint:'模拟模式：点击填入演示账号', demoAdmin:'管理员', demoUser:'客户',
+    hello:'你好', myDevices:'我的设备', allDevices:'全部设备', dashSub:'数据每隔几秒自动刷新',
+    total:'设备总数', onlineN:'在线', avgPm:'平均 PM2.5 (µg/m³)', alertsN:'超过阈值',
+    online:'在线', offline:'离线', power:'电源', fan:'风速', mode:'模式',
+    pm25:'PM2.5', co2:'CO₂', temp:'温度', hum:'湿度', alertAt:'AQI 超过以下值时提醒',
+    raw:'Tuya 原始数据', noData:'暂无数据', noDevices:'此账户下还没有设备。请在下方输入设备 ID 进行绑定。',
+    claimTitle:'绑定设备到账户', claimLabel:'设备 ID', claimBtn:'绑定设备', claimMock:'模拟模式：试试 tuya_new_0001',
+    refresh:'刷新', settings:'连接设置', save:'保存', close:'关闭', test:'测试连接',
+    modeMock:'模拟数据', modeMockD:'无需后端即可体验', modeLive:'真实 API', modeLiveD:'调用您的后端',
+    apiBase:'后端 Base URL', poll:'刷新间隔（秒）', contract:'后端需要提供的 API',
+    addDevice:'添加设备', devId:'设备 ID', devName:'设备名称', devLoc:'位置', owner:'所有者', unassigned:'— 无所有者 —',
+    devices:'设备', users:'用户', audit:'指令日志', time:'时间', user:'用户', action:'操作', device:'设备',
+    status:'状态', del:'删除', addUser:'添加用户', name:'姓名', role:'角色', devCount:'设备数',
+    mockBanner:'当前使用模拟数据。点击齿轮按钮可切换到真实 API。',
+    sent:'指令已发送', saved:'已保存', failed:'失败', confirmDel:'确定从系统中移除该设备？', assigned:'所有者已更新',
+    alertBanner:'AQI 超过阈值：', tested:'连接成功', loginFail:'登录失败',
+    f_auto:'自动', f_low:'低', f_mid:'中', f_high:'高', f_sleep:'睡眠', f_manual:'手动',
+    bGood:'优', bMod:'良', bUsg:'对敏感人群不健康', bUnh:'不健康', bVun:'非常不健康', bHaz:'危险',
+    roleAdmin:'管理员', roleUser:'客户', devHelp:'在“所有者”列分配设备。客户只能看到自己的设备。' }
+};
+
+/* =====================================================================
+   State + storage
+   ===================================================================== */
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v===null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+const sess = {
+  get(k){ try{ return sessionStorage.getItem(k); }catch(e){ return null; } },
+  set(k, v){ try{ v==null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k, v); }catch(e){} }
+};
+const S = {
+  lang: store.get('ag.lang','th'), theme: store.get('ag.theme','dark'),
+  mode: store.get('ag.mode', CFG.defaultMode), apiBase: store.get('ag.base', CFG.apiBase), pollMs: store.get('ag.poll', CFG.pollMs),
+  alerts: store.get('ag.alerts', {}),
+  token: sess.get('ag.token'), user: null, view: 'home', adminTab: 'devices',
+  devices: [], users: [], audit: [], hist: {}, openRaw: new Set(), timer: null,
+  waqiKey: store.get('ag.waqi', CFG.waqiToken || ''), stations: [], markerLayer: null
+};
+const t = k => (T[S.lang] && T[S.lang][k]) || T.en[k] || k;
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+function toast(msg){ const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show'); clearTimeout(toast.t); toast.t=setTimeout(()=>el.classList.remove('show'),2400); }
+
+/* =====================================================================
+   AQI helpers (US EPA จาก PM2.5)
+   ===================================================================== */
+const PM_BP = [[0,12,0,50],[12.1,35.4,51,100],[35.5,55.4,101,150],[55.5,150.4,151,200],[150.5,250.4,201,300],[250.5,350.4,301,400],[350.5,500.4,401,500]];
+function pm25ToAqi(c){
+  if (c==null || isNaN(c)) return null;
+  c = Math.floor(c*10)/10;
+  for (const [cl,ch,il,ih] of PM_BP) if (c<=ch) return Math.round((ih-il)/(ch-cl)*(c-cl)+il);
+  return 500;
+}
+function band(a){ if(a==null)return null; if(a<=50)return 'good'; if(a<=100)return 'moderate'; if(a<=150)return 'usg'; if(a<=200)return 'unhealthy'; if(a<=300)return 'veryunhealthy'; return 'hazardous'; }
+const BCOL = {good:'#4FD1B8',moderate:'#E8C25A',usg:'#E89B4C',unhealthy:'#E1615E',veryunhealthy:'#A667C9',hazardous:'#B0466B'};
+const BKEY = {good:'bGood',moderate:'bMod',usg:'bUsg',unhealthy:'bUnh',veryunhealthy:'bVun',hazardous:'bHaz'};
+
+/* =====================================================================
+   Normalizer — แปลงข้อมูลสถานะแบบ Tuya ให้เป็นรูปแบบเดียวที่หน้าเว็บใช้
+   (Mock และ API จริง ผ่านตัวเดียวกัน → ต่อ API จริงแล้วแสดงผลได้ทันที)
+   ===================================================================== */
+function toMap(st){
+  if (Array.isArray(st)){ const m={}; st.forEach(x=>{ if(x && x.code!=null) m[x.code]=x.value; }); return m; }
+  return (st && typeof st==='object') ? st : {};
+}
+function normalize(raw){
+  const map = toMap(raw.status || raw.properties || []);
+  const codes = {};
+  for (const k in CFG.codes) codes[k] = CFG.codes[k].find(c=>c in map) || CFG.codes[k][0];
+  const val = k => (codes[k] in map) ? map[codes[k]] : null;
+  const num = k => { const v=val(k); if(v===null||v==='') return null; const n=Number(v); return isNaN(n)?null:Math.round(n*(CFG.scale[codes[k]]??1)*10)/10; };
+  const p = val('power');
+  return {
+    id: raw.id || raw.device_id, name: raw.name || raw.id || raw.device_id, location: raw.location || '',
+    ownerId: raw.owner_id ?? raw.ownerId ?? null, online: raw.online !== false,
+    power: p===true || p==='true' || p===1 || p==='on',
+    pm25: num('pm25'), co2: num('co2'), temp: num('temp'), hum: num('hum'),
+    fan: val('fan'), mode: val('mode'), codes, raw: map
+  };
+}
+
+/* =====================================================================
+   API adapters — สัญญา (contract) เดียวกัน 2 แบบ: Mock และ Live
+   ===================================================================== */
+const Mock = (()=>{
+  const rnd = (a,b)=>a+Math.random()*(b-a);
+  const mk = (id,name,loc,owner,online,pm)=>({id,name,location:loc,owner_id:owner,online,
+    sim:{power:true,pm25:pm,co2:rnd(480,900),temp:rnd(24,29),hum:rnd(45,68),fan:'auto',mode:'auto'}});
+  const db = {
+    users:[
+      {id:'u1',name:'Admin',email:'admin@aerogrid.io',password:'admin123',role:'admin'},
+      {id:'u2',name:'สมชาย ใจดี',email:'somchai@example.com',password:'user123',role:'user'},
+      {id:'u3',name:'Mali Chen',email:'mali@example.com',password:'user123',role:'user'}
+    ],
+    devices:[
+      mk('tuya_a1b2c3','Living room','Sukhumvit, Bangkok','u2',true,24),
+      mk('tuya_d4e5f6','Bedroom','Sukhumvit, Bangkok','u2',true,11),
+      mk('tuya_g7h8i9','Office','Silom, Bangkok','u3',true,68),
+      mk('tuya_j0k1l2','Showroom','Chiang Mai','u3',false,40),
+      mk('tuya_m3n4o5','Warehouse','Rayong',null,true,132),
+      mk('tuya_new_0001','ห้องรับแขก (ใหม่)','—',null,true,30)
+    ],
+    audit:[]
+  };
+  const statusOf = d => { const s=d.sim; return [
+    {code:'switch',value:s.power},{code:'pm25',value:Math.round(s.pm25)},{code:'co2_value',value:Math.round(s.co2)},
+    {code:'temp_current',value:Math.round(s.temp*10)/10},{code:'humidity_value',value:Math.round(s.hum)},
+    {code:'fan_speed_enum',value:s.fan},{code:'mode',value:s.mode}]; };
+  const drift = d => { const s=d.sim; const target = s.power ? (s.fan==='high'?6:s.fan==='mid'?10:14) : 55;
+    s.pm25 = Math.max(2, Math.min(240, s.pm25 + (target-s.pm25)*0.06 + rnd(-3,3)));
+    s.co2 = Math.max(420, Math.min(1600, s.co2 + rnd(-25,25))); s.temp += rnd(-.1,.1); s.hum = Math.max(30,Math.min(85,s.hum+rnd(-1,1))); };
+  const view = d => ({id:d.id,name:d.name,location:d.location,owner_id:d.owner_id,online:d.online,status:statusOf(d)});
+  const me = () => { const id=(S.token||'').replace('mock-',''); const u=db.users.find(x=>x.id===id); if(!u) throw new Error('401'); return u; };
+  const pub = u => ({id:u.id,name:u.name,email:u.email,role:u.role});
+  const log = (u,dev,act)=>db.audit.unshift({time:new Date().toISOString(),user:u.email,device:dev,action:act});
+  return {
+    async login(email,pw){ await sleep(250); const u=db.users.find(x=>x.email===email&&x.password===pw); if(!u) throw new Error('Invalid credentials'); return {token:'mock-'+u.id,user:pub(u)}; },
+    async me(){ return pub(me()); },
+    async devices(){ await sleep(120); const u=me(); db.devices.forEach(d=>{ if(d.online) drift(d); });
+      return db.devices.filter(d=>u.role==='admin'||d.owner_id===u.id).map(view); },
+    async command(id,commands){ await sleep(200); const u=me(); const d=db.devices.find(x=>x.id===id);
+      if(!d||(u.role!=='admin'&&d.owner_id!==u.id)) throw new Error('Forbidden'); if(!d.online) throw new Error('Device offline');
+      commands.forEach(c=>{ const s=d.sim; if(c.code==='switch')s.power=!!c.value; else if(c.code==='fan_speed_enum')s.fan=c.value; else if(c.code==='mode')s.mode=c.value; });
+      log(u,d.id,JSON.stringify(commands)); return {ok:true}; },
+    async claim(code){ await sleep(200); const u=me(); const d=db.devices.find(x=>x.id===code);
+      if(!d) throw new Error('Device not found'); if(d.owner_id) throw new Error('Already linked'); d.owner_id=u.id; log(u,d.id,'claim'); return {ok:true}; },
+    async adminUsers(){ me(); return db.users.map(pub); },
+    async adminAddUser(b){ const u=me(); if(db.users.some(x=>x.email===b.email)) throw new Error('Email exists');
+      db.users.push({id:'u'+(db.users.length+1+Date.now()%1000),name:b.name,email:b.email,password:b.password,role:'user'}); log(u,'-','add user '+b.email); return {ok:true}; },
+    async adminAddDevice(b){ const u=me(); if(db.devices.some(x=>x.id===b.device_id)) throw new Error('Device exists');
+      db.devices.push(mk(b.device_id,b.name||b.device_id,b.location||'—',null,true,rnd(10,60))); log(u,b.device_id,'add device'); return {ok:true}; },
+    async adminSetOwner(id,userId){ const u=me(); const d=db.devices.find(x=>x.id===id); d.owner_id=userId||null; log(u,id,'set owner '+(userId||'none')); return {ok:true}; },
+    async adminDelDevice(id){ const u=me(); db.devices=db.devices.filter(x=>x.id!==id); log(u,id,'delete device'); return {ok:true}; },
+    async adminAudit(){ me(); return db.audit.slice(0,100); },
+    async health(){ return {ok:true}; }
+  };
+})();
+
+const Live = (()=>{
+  async function http(method,path,body){
+    const res = await fetch(S.apiBase.replace(/\/$/,'')+path,{
+      method, headers:{'Content-Type':'application/json',...(S.token?{Authorization:'Bearer '+S.token}:{})},
+      body: body?JSON.stringify(body):undefined
+    });
+    let data=null; try{ data=await res.json(); }catch(e){}
+    if (res.status===401){ const e=new Error('401'); e.auth=true; throw e; }
+    if (!res.ok) throw new Error((data&&(data.msg||data.message||data.error))||('HTTP '+res.status));
+    // รองรับทั้งรูปแบบธรรมดา และรูปแบบ Tuya {success, result}
+    if (data && typeof data==='object' && 'success' in data){ if(!data.success) throw new Error(data.msg||'error'); return data.result; }
+    return data;
+  }
+  return {
+    login:(email,password)=>http('POST','/auth/login',{email,password}),
+    me:()=>http('GET','/me'),
+    devices:()=>http('GET','/devices'),
+    command:(id,commands)=>http('POST','/devices/'+encodeURIComponent(id)+'/command',{commands}),
+    claim:code=>http('POST','/devices/claim',{code}),
+    adminUsers:()=>http('GET','/admin/users'),
+    adminAddUser:b=>http('POST','/admin/users',b),
+    adminAddDevice:b=>http('POST','/admin/devices',b),
+    adminSetOwner:(id,userId)=>http('PUT','/admin/devices/'+encodeURIComponent(id)+'/owner',{user_id:userId||null}),
+    adminDelDevice:id=>http('DELETE','/admin/devices/'+encodeURIComponent(id)),
+    adminAudit:()=>http('GET','/admin/audit'),
+    health:()=>http('GET','/health')
+  };
+})();
+const API = () => S.mode==='live' ? Live : Mock;
+
+/* =====================================================================
+   Data flow
+   ===================================================================== */
+async function loadDevices(){
+  const raw = await API().devices();
+  const list = (Array.isArray(raw) ? raw : (raw && (raw.devices||raw.list)) || []);
+  S.devices = list.map(normalize);
+  S.devices.forEach(d=>{
+    const h = S.hist[d.id] || (S.hist[d.id]=[]);
+    if (d.pm25!=null){
+      if (S.mode==='mock' && h.length===0) for(let i=0;i<CFG.historyPoints-1;i++) h.push(Math.max(2,d.pm25+(Math.random()-.5)*14));
+      h.push(d.pm25); while(h.length>CFG.historyPoints) h.shift();
+    }
+  });
+}
+async function refresh(silent){
+  try{
+    await loadDevices();
+    if (S.view==='admin'){ const a=document.activeElement; if(silent && a && /^(SELECT|INPUT)$/.test(a.tagName)) return; await loadAdmin(); }
+    if (S.view!=='home') render();
+  }catch(e){ if(e.auth) return logout(); if(!silent) toast(t('failed')+': '+e.message); }
+}
+async function loadAdmin(){
+  if (S.user.role!=='admin') return;
+  const [u,a] = await Promise.all([API().adminUsers(), API().adminAudit()]);
+  S.users = Array.isArray(u)?u:(u&&u.users)||[]; S.audit = Array.isArray(a)?a:(a&&a.logs)||[];
+}
+function startPolling(){
+  clearInterval(S.timer);
+  S.timer = setInterval(()=>{ if(!document.hidden && S.user) refresh(true); }, Math.max(2000, S.pollMs));
+}
+async function doLogin(email,pw){
+  try{
+    const r = await API().login(email,pw);
+    S.token = r.token || r.access_token; sess.set('ag.token',S.token); S.user = r.user;
+    S.view='dash'; await refresh(); startPolling();
+  }catch(e){ toast(t('loginFail')+': '+e.message); }
+}
+function logout(){ clearInterval(S.timer); S.view='home'; S.token=null; S.user=null; S.devices=[]; S.hist={}; sess.set('ag.token',null); render(); }
+async function send(id, commands){
+  try{ await API().command(id,commands); toast(t('sent')); await refresh(true); }
+  catch(e){ if(e.auth) return logout(); toast(t('failed')+': '+e.message); }
+}
+
+/* =====================================================================
+   Rendering
+   ===================================================================== */
+const ICON = {
+  sun:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>',
+  moon:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.4 14.9A7.5 7.5 0 0 1 9.1 3.6 9 9 0 1 0 20.4 14.9z"/></svg>',
+  gear:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>'
+};
+
+function navHtml(){
+  const u = S.user;
+  const tabs = u ? `<div class="tabs" role="tablist">
+      <button class="tab ${S.view==='home'?'on':''}" data-act="view" data-v="home">${t('home')}</button>
+      <button class="tab ${S.view==='dash'?'on':''}" data-act="view" data-v="dash">${u.role==='admin'?t('allDevices'):t('dash')}</button>
+      ${u.role==='admin'?`<button class="tab ${S.view==='admin'?'on':''}" data-act="view" data-v="admin">${t('admin')}</button>`:''}
+    </div>` : '<div></div>';
+  return `<button class="brand" data-act="view" data-v="home" aria-label="AEROGRID"><span class="brand-mark"></span>AEROGRID</button>
+    ${tabs}
+    <div class="nav-right">
+      ${S.view!=='home'?`<span class="chip ${S.mode}">${S.mode==='live'?'LIVE API':'MOCK DATA'}</span>`:''}
+      <div class="langsw" role="group" aria-label="Language">
+        ${['th','en','zh'].map(l=>`<button class="${S.lang===l?'active':''}" data-act="lang" data-l="${l}">${l==='zh'?'中文':l.toUpperCase()}</button>`).join('')}
+      </div>
+      <button class="icon-btn" data-act="theme" aria-label="Theme">${S.theme==='dark'?ICON.sun:ICON.moon}</button>
+      ${CFG.showSettings?`<button class="icon-btn" data-act="settings" aria-label="${esc(t('settings'))}" title="${esc(t('settings'))}">${ICON.gear}</button>`:''}
+      ${u?`<span class="user-name">${esc(u.name)}</span><button class="btn" data-act="logout">${t('logout')}</button>`
+         :(S.view==='login'?'':`<button class="btn pri" data-act="view" data-v="login">${t('signin')}</button>`)}
+    </div>`;
+}
+
+function loginHtml(){
+  return `<main><div class="login-wrap">
+    <div><h1>${t('loginTitle')}</h1><p class="sub">${t('loginSub')}</p><button class="btn" data-act="view" data-v="home">${t('backHome')}</button></div>
+    <form class="panel" id="loginForm" autocomplete="on">
+      <div class="field"><label for="em">${t('email')}</label><input id="em" type="email" required autocomplete="username"></div>
+      <div class="field"><label for="pw">${t('password')}</label><input id="pw" type="password" required autocomplete="current-password"></div>
+      <button class="btn pri" style="width:100%" type="submit">${t('signin')}</button>
+      ${S.mode==='mock'?`<div class="hint">${t('demoHint')}</div>
+        <div class="demo">
+          <button type="button" class="btn" data-act="demo" data-e="admin@aerogrid.io" data-p="admin123">${t('demoAdmin')}</button>
+          <button type="button" class="btn" data-act="demo" data-e="somchai@example.com" data-p="user123">${t('demoUser')}</button>
+        </div>`:''}
+    </form>
+  </div></main>`;
+}
+
+function spark(arr,color){
+  if (!arr || arr.length<2) return '';
+  const w=120,h=34,mx=Math.max(...arr,15),mn=Math.min(...arr,0);
+  const pts = arr.map((v,i)=>`${(i/(arr.length-1)*w).toFixed(1)},${(h-2-(v-mn)/(mx-mn||1)*(h-4)).toFixed(1)}`).join(' ');
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+}
+const optLabel = v => { const k='f_'+v; return T[S.lang][k] ? t(k) : String(v); };
+const seg = (id,act,opts,cur,dis) => `<div class="seg">${opts.map(o=>`<button ${dis?'disabled':''} class="${cur===o?'on':''}" data-act="${act}" data-id="${esc(id)}" data-val="${esc(o)}">${esc(optLabel(o))}</button>`).join('')}</div>`;
+const fmt = (v,u) => v==null ? '—' : v+(u||'');
+
+function deviceCard(d){
+  const aqi = pm25ToAqi(d.pm25), b = band(aqi), col = b?BCOL[b]:'#7E8B98';
+  const thr = S.alerts[d.id] || 150;
+  const dis = !d.online;
+  // ถ้าอุปกรณ์รายงานค่าที่ไม่อยู่ในรายการ ให้เพิ่มเข้าไปเพื่อให้แสดงสถานะจริงได้
+  const fans = d.fan!=null && !CFG.fanOptions.includes(d.fan) ? [...CFG.fanOptions,d.fan] : CFG.fanOptions;
+  const modes = d.mode!=null && !CFG.modeOptions.includes(d.mode) ? [...CFG.modeOptions,d.mode] : CFG.modeOptions;
+  return `<article class="dev ${dis?'off':''}">
+    <div class="dev-top">
+      <div><div class="dev-name">${esc(d.name)}</div><div class="dev-loc">${esc(d.location)}${d.location?' · ':''}<span class="mono">${esc(d.id)}</span></div></div>
+      <span class="pill" style="background:${d.online?'rgba(79,209,184,.14)':'rgba(140,150,160,.16)'};color:${d.online?'var(--c-good)':'var(--dim)'}">${d.online?t('online'):t('offline')}</span>
+    </div>
+    <div class="aqi-row">
+      <div><div class="aqi" style="color:${col}">${aqi==null?'—':aqi}</div>
+        <div class="aqi-l">AQI · ${b?esc(t(BKEY[b])):t('noData')}</div></div>
+      ${spark(S.hist[d.id],col)}
+    </div>
+    <div class="metrics">
+      <div class="metric"><b>${fmt(d.pm25)}</b><span>${t('pm25')}</span></div>
+      <div class="metric"><b>${fmt(d.co2)}</b><span>${t('co2')}</span></div>
+      <div class="metric"><b>${fmt(d.temp,'°')}</b><span>${t('temp')}</span></div>
+      <div class="metric"><b>${fmt(d.hum,'%')}</b><span>${t('hum')}</span></div>
+    </div>
+    <div class="ctl"><span>${t('power')}</span>
+      <button class="switch ${d.power?'on':''}" role="switch" aria-checked="${d.power}" aria-label="${esc(t('power'))}" ${dis?'disabled':''} data-act="power" data-id="${esc(d.id)}"></button></div>
+    <div class="ctl"><span>${t('fan')}</span>${seg(d.id,'fan',fans,d.fan,dis||!d.power)}</div>
+    <div class="ctl"><span>${t('mode')}</span>${seg(d.id,'mode',modes,d.mode,dis||!d.power)}</div>
+    <div class="ctl"><span>${t('alertAt')}</span>
+      <select data-thr="${esc(d.id)}" aria-label="${esc(t('alertAt'))}">${[100,150,200].map(v=>`<option value="${v}" ${thr===v?'selected':''}>${v}</option>`).join('')}</select></div>
+    <details data-raw="${esc(d.id)}" ${S.openRaw.has(d.id)?'open':''}><summary>${t('raw')}</summary><pre>${esc(JSON.stringify(d.raw,null,2))}</pre></details>
+  </article>`;
+}
+
+function dashHtml(){
+  const u=S.user, list=S.devices;
+  const online = list.filter(d=>d.online).length;
+  const pms = list.map(d=>d.pm25).filter(v=>v!=null);
+  const avg = pms.length ? Math.round(pms.reduce((a,b)=>a+b,0)/pms.length) : '—';
+  const over = list.filter(d=>{ const a=pm25ToAqi(d.pm25); return a!=null && a>(S.alerts[d.id]||150); });
+  return `<main>
+    <h1>${t('hello')}, ${esc(u.name)}</h1>
+    <p class="sub">${u.role==='admin'?t('allDevices'):t('myDevices')} · ${t('dashSub')}</p>
+    ${S.mode==='mock'?`<div class="note">${t('mockBanner')}</div>`:''}
+    ${over.length?`<div class="banner" role="alert">${t('alertBanner')} <b>${over.map(d=>esc(d.name)+' ('+pm25ToAqi(d.pm25)+')').join(', ')}</b></div>`:''}
+    <div class="stats">
+      <div class="kpi"><b>${list.length}</b><span>${t('total')}</span></div>
+      <div class="kpi"><b style="color:var(--c-good)">${online}</b><span>${t('onlineN')}</span></div>
+      <div class="kpi"><b>${avg}</b><span>${t('avgPm')}</span></div>
+      <div class="kpi"><b style="color:${over.length?'var(--c-unhealthy)':'inherit'}">${over.length}</b><span>${t('alertsN')}</span></div>
+    </div>
+    ${list.length?`<div class="grid">${list.map(deviceCard).join('')}</div>`:`<div class="panel empty">${t('noDevices')}</div>`}
+    <div class="panel" style="margin-top:22px">
+      <h2 style="margin-bottom:12px">${t('claimTitle')}</h2>
+      <form class="row" id="claimForm">
+        <div><label for="claimCode">${t('claimLabel')}</label><input id="claimCode" required autocomplete="off" spellcheck="false"></div>
+        <button class="btn pri" type="submit">${t('claimBtn')}</button>
+      </form>
+      ${S.mode==='mock'?`<div class="hint">${t('claimMock')}</div>`:''}
+    </div>
+  </main>`;
+}
+
+function adminHtml(){
+  const tabs = [['devices',t('devices')],['users',t('users')],['audit',t('audit')]];
+  let body='';
+  if (S.adminTab==='devices'){
+    const ownerOpts = id => `<option value="">${t('unassigned')}</option>` + S.users.map(x=>`<option value="${esc(x.id)}" ${S.devices.find(d=>d.id===id)?.ownerId===x.id?'selected':''}>${esc(x.name)} (${esc(x.email)})</option>`).join('');
+    body = `<div class="panel" style="margin-bottom:16px"><h2 style="margin-bottom:12px">${t('addDevice')}</h2>
+      <form class="row" id="addDevForm">
+        <div><label for="nd-id">${t('devId')}</label><input id="nd-id" required spellcheck="false" autocomplete="off"></div>
+        <div><label for="nd-name">${t('devName')}</label><input id="nd-name" autocomplete="off"></div>
+        <div><label for="nd-loc">${t('devLoc')}</label><input id="nd-loc" autocomplete="off"></div>
+        <button class="btn pri" type="submit">${t('addDevice')}</button></form>
+      <div class="hint">${t('devHelp')}</div></div>
+      <div class="table-wrap"><table><thead><tr><th>${t('device')}</th><th>${t('status')}</th><th>${t('pm25')}</th><th>${t('owner')}</th><th></th></tr></thead><tbody>
+      ${S.devices.map(d=>`<tr>
+        <td><b>${esc(d.name)}</b><div class="mono" style="font-size:11px;color:var(--faint)">${esc(d.id)}</div></td>
+        <td><span class="dot" style="background:${d.online?'var(--c-good)':'var(--faint)'}"></span>${d.online?t('online'):t('offline')}</td>
+        <td class="mono">${fmt(d.pm25)}</td>
+        <td><select data-owner="${esc(d.id)}" aria-label="${esc(t('owner'))}">${ownerOpts(d.id)}</select></td>
+        <td><button class="btn danger" data-act="deldev" data-id="${esc(d.id)}">${t('del')}</button></td></tr>`).join('')||`<tr><td colspan="5" class="empty">${t('noData')}</td></tr>`}
+      </tbody></table></div>`;
+  } else if (S.adminTab==='users'){
+    body = `<div class="panel" style="margin-bottom:16px"><h2 style="margin-bottom:12px">${t('addUser')}</h2>
+      <form class="row" id="addUserForm">
+        <div><label for="nu-name">${t('name')}</label><input id="nu-name" required></div>
+        <div><label for="nu-email">${t('email')}</label><input id="nu-email" type="email" required></div>
+        <div><label for="nu-pw">${t('password')}</label><input id="nu-pw" type="password" required minlength="6" autocomplete="new-password"></div>
+        <button class="btn pri" type="submit">${t('addUser')}</button></form></div>
+      <div class="table-wrap"><table><thead><tr><th>${t('name')}</th><th>${t('email')}</th><th>${t('role')}</th><th>${t('devCount')}</th></tr></thead><tbody>
+      ${S.users.map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.email)}</td><td>${x.role==='admin'?t('roleAdmin'):t('roleUser')}</td><td class="mono">${S.devices.filter(d=>d.ownerId===x.id).length}</td></tr>`).join('')}
+      </tbody></table></div>`;
+  } else {
+    body = `<div class="table-wrap"><table><thead><tr><th>${t('time')}</th><th>${t('user')}</th><th>${t('device')}</th><th>${t('action')}</th></tr></thead><tbody>
+      ${S.audit.map(a=>`<tr><td class="mono" style="font-size:12px">${esc(new Date(a.time||a.created_at).toLocaleString())}</td><td>${esc(a.user||a.user_email||a.user_id)}</td><td class="mono" style="font-size:12px">${esc(a.device||a.device_id)}</td><td class="mono" style="font-size:12px">${esc(a.action||a.commands)}</td></tr>`).join('')||`<tr><td colspan="4" class="empty">${t('noData')}</td></tr>`}
+      </tbody></table></div>`;
+  }
+  return `<main>
+    <h1>${t('admin')}</h1>
+    <div class="sec-head" style="margin-top:12px">
+      <div class="tabs">${tabs.map(([k,l])=>`<button class="tab ${S.adminTab===k?'on':''}" data-act="atab" data-v="${k}">${l}</button>`).join('')}</div>
+      <button class="btn" data-act="refresh">${t('refresh')}</button>
+    </div>${body}</main>`;
+}
+
+function render(){
+  document.documentElement.setAttribute('data-theme',S.theme);
+  document.documentElement.lang = S.lang;
+  document.body.setAttribute('data-lang',S.lang);
+  document.getElementById('nav').innerHTML = navHtml();
+  const home = S.view==='home';
+  document.getElementById('homeView').hidden = !home;
+  const cv = document.getElementById('consoleView'); cv.hidden = home;
+  if (home){ renderLanguage(); if (map) setTimeout(()=>map.invalidateSize(),0); return; }
+  let v = S.view;
+  if (!S.user) v='login'; else if (v==='login') v='dash';
+  cv.innerHTML = v==='login' ? loginHtml() : (v==='admin' && S.user.role==='admin' ? adminHtml() : dashHtml());
+}
+
+/* ---------- settings dialog ---------- */
+function openSettings(){
+  const dlg = document.getElementById('settings');
+  dlg.innerHTML = `<h2>${t('settings')}</h2>
+    <div class="radio" id="modeRadio">
+      <button data-act="setmode" data-m="mock" class="${S.mode==='mock'?'on':''}">${t('modeMock')}<small>${t('modeMockD')}</small></button>
+      <button data-act="setmode" data-m="live" class="${S.mode==='live'?'on':''}">${t('modeLive')}<small>${t('modeLiveD')}</small></button>
+    </div>
+    <div class="field"><label for="s-base">${t('apiBase')}</label><input id="s-base" class="mono" value="${esc(S.apiBase)}" spellcheck="false"></div>
+    <div class="field"><label for="s-poll">${t('poll')}</label><input id="s-poll" type="number" min="2" max="300" value="${Math.round(S.pollMs/1000)}"></div>
+    <div><b style="font-size:13px">${t('contract')}</b></div>
+    <div class="contract">POST /auth/login → {token, user:{id,name,email,role}}<br>GET /me · GET /health<br>GET /devices → [{id,name,location,owner_id,online,<br>&nbsp;&nbsp;status:[{code,value}]}]<br>POST /devices/:id/command {commands:[{code,value}]}<br>POST /devices/claim {code}<br>GET|POST /admin/users · POST /admin/devices<br>PUT /admin/devices/:id/owner {user_id}<br>DELETE /admin/devices/:id · GET /admin/audit</div>
+    <div class="row" style="justify-content:space-between">
+      <button class="btn" data-act="testconn" style="flex:none">${t('test')}</button>
+      <div style="flex:none;display:flex;gap:8px"><button class="btn" data-act="closesettings">${t('close')}</button><button class="btn pri" data-act="savesettings">${t('save')}</button></div>
+    </div>
+    <div class="msg" id="testMsg"></div>`;
+  dlg._mode = S.mode;
+  dlg.showModal();
+}
+
+/* =====================================================================
+   Events
+   ===================================================================== */
+document.addEventListener('click', async e=>{
+  const el = e.target.closest('[data-act]'); if(!el) return;
+  const a = el.dataset.act, id = el.dataset.id;
+  const d = S.devices.find(x=>x.id===id);
+  if (a==='lang'){ S.lang=el.dataset.l; store.set('ag.lang',S.lang); render(); }
+  else if (a==='theme'){ S.theme = S.theme==='dark'?'light':'dark'; store.set('ag.theme',S.theme); applyTheme(); render(); }
+  else if (a==='settings') openSettings();
+  else if (a==='closesettings') document.getElementById('settings').close();
+  else if (a==='setmode'){ const dlg=document.getElementById('settings'); dlg._mode=el.dataset.m;
+    dlg.querySelectorAll('#modeRadio button').forEach(b=>b.classList.toggle('on',b.dataset.m===dlg._mode)); }
+  else if (a==='savesettings'){
+    const dlg=document.getElementById('settings'); const modeChanged = dlg._mode!==S.mode;
+    S.mode=dlg._mode; S.apiBase=document.getElementById('s-base').value.trim()||CFG.apiBase;
+    S.pollMs=Math.max(2,Number(document.getElementById('s-poll').value)||5)*1000;
+    store.set('ag.mode',S.mode); store.set('ag.base',S.apiBase); store.set('ag.poll',S.pollMs);
+    dlg.close(); toast(t('saved'));
+    if (modeChanged){ logout(); } else { if(S.user) startPolling(); render(); }
+  }
+  else if (a==='testconn'){
+    const msg=document.getElementById('testMsg'); const prevMode=S.mode, prevBase=S.apiBase;
+    S.mode='live'; S.apiBase=document.getElementById('s-base').value.trim()||CFG.apiBase;
+    try{ await Live.health(); msg.style.color='var(--c-good)'; msg.textContent='✓ '+t('tested'); }
+    catch(err){ msg.style.color='var(--c-unhealthy)'; msg.textContent=err.message+' (CORS / URL?)'; }
+    S.mode=prevMode; S.apiBase=prevBase;
+  }
+  else if (a==='view'){ S.view=el.dataset.v; if(S.view==='admin'){ await loadAdmin().catch(()=>{}); } render(); }
+  else if (a==='atab'){ S.adminTab=el.dataset.v; render(); }
+  else if (a==='refresh') refresh();
+  else if (a==='logout') logout();
+  else if (a==='demo'){ document.getElementById('em').value=el.dataset.e; document.getElementById('pw').value=el.dataset.p; }
+  else if (a==='power' && d) send(id,[{code:d.codes.power,value:!d.power}]);
+  else if (a==='fan' && d) send(id,[{code:d.codes.fan,value:el.dataset.val}]);
+  else if (a==='mode' && d) send(id,[{code:d.codes.mode,value:el.dataset.val}]);
+  else if (a==='deldev'){ if(!confirm(t('confirmDel'))) return;
+    try{ await API().adminDelDevice(id); await refresh(); }catch(err){ toast(t('failed')+': '+err.message); } }
+});
+
+document.addEventListener('change', async e=>{
+  const el=e.target;
+  if (el.dataset.thr){ S.alerts[el.dataset.thr]=Number(el.value); store.set('ag.alerts',S.alerts); toast(t('saved')); render(); }
+  else if (el.dataset.owner){
+    try{ await API().adminSetOwner(el.dataset.owner, el.value); toast(t('assigned')); await refresh(); }
+    catch(err){ toast(t('failed')+': '+err.message); }
+  }
+});
+document.addEventListener('toggle', e=>{ const el=e.target; if(el.dataset && el.dataset.raw){ el.open ? S.openRaw.add(el.dataset.raw) : S.openRaw.delete(el.dataset.raw); } }, true);
+
+document.addEventListener('submit', async e=>{
+  e.preventDefault(); const f=e.target.id;
+  try{
+    if (f==='loginForm') await doLogin(document.getElementById('em').value.trim(), document.getElementById('pw').value);
+    else if (f==='claimForm'){ await API().claim(document.getElementById('claimCode').value.trim()); toast(t('saved')); await refresh(); }
+    else if (f==='addDevForm'){ await API().adminAddDevice({device_id:document.getElementById('nd-id').value.trim(),name:document.getElementById('nd-name').value.trim(),location:document.getElementById('nd-loc').value.trim()}); toast(t('saved')); await refresh(); }
+    else if (f==='addUserForm'){ await API().adminAddUser({name:document.getElementById('nu-name').value.trim(),email:document.getElementById('nu-email').value.trim(),password:document.getElementById('nu-pw').value}); toast(t('saved')); await refresh(); }
+  }catch(err){ if(err.auth) return logout(); toast(t('failed')+': '+err.message); }
+});
+
+/* =====================================================================
+   หน้าแรกสาธารณะ: แผนที่ความหนาแน่นอากาศ (ดีไซน์และการทำงานเดิม)
+   ===================================================================== */
+const I18N = {
+  th: {
+    eyebrow: "ดัชนีความหนาแน่นอากาศ (เรียลไทม์)",
+    h1: 'ความหนาแน่นอากาศ<br>ของโลก <em>มองเห็นได้</em> จริง',
+    sub: "AEROGRID ดึงค่าคุณภาพอากาศสดจากเครือข่ายสถานี WAQI (12,000+ จุดทั่วโลก) มาแสดงบนแผนที่จริง — ยิ่งจุดใหญ่และสว่างเท่าไหร่ อากาศบริเวณนั้นยิ่งหนาแน่นด้วยมลพิษมากเท่านั้น",
+    statAvg: "ค่าเฉลี่ย AQI ทั่วโลกตอนนี้",
+    statCities: "สถานีที่ดึงข้อมูลได้บนแผนที่",
+    statDanger: "สถานีที่อยู่ในระดับอันตราย",
+    scanning: "สแกนสถานีตรวจวัด ณ ขณะนี้",
+    refresh: "ดึงข้อมูลใหม่",
+    apiKeyLabel: "WAQI API token:",
+    save: "บันทึก",
+    legendTitle: "มาตรฐาน AQI",
+    bandGood: "ดี", bandModerate: "ปานกลาง", bandUsg: "มีผลต่อกลุ่มเสี่ยง",
+    bandUnhealthy: "เริ่มเป็นอันตราย", bandVeryUnhealthy: "อันตรายมาก", bandHazardous: "อันตรายร้ายแรง",
+    sectionTitle: "ความหนาแน่นอากาศแยกตามทวีป",
+    sectionNote: "ค่าเฉลี่ย AQI สดจากทุกสถานีของ WAQI ในแต่ละทวีปที่ดึงมาได้บนแผนที่ตอนนี้",
+    disclosure: '* เมื่อใส่ token ของคุณเองแล้ว ตัวเลขทั้งหมดในหน้านี้จะเป็น <strong>ข้อมูลจริงแบบเรียลไทม์จาก WAQI (aqicn.org)</strong> หากยังไม่ใส่ token หน้านี้จะแสดงสถานะ "รอข้อมูล" แทน แผนที่ฐาน © OpenStreetMap contributors, © CARTO',
+    footerLeft: "AEROGRID — Air Density Visualization · Live Build 2026",
+    footerRight: "แหล่งข้อมูล: World Air Quality Index Project (WAQI)",
+    loading: "กำลังโหลด…", noKey: "รอ token", error: "โหลดไม่สำเร็จ",
+    needKey: "ยังไม่ได้ใส่ token — ", getKeyLink: "ขอฟรีที่ WAQI",
+    keyOk: "บันทึก token แล้ว กำลังดึงข้อมูล…",
+    corsWarn: "หากคำขอถูกบล็อกโดยเบราว์เซอร์ (CORS) ให้เชื่อมผ่านเซิร์ฟเวอร์ฝั่งคุณเองแทนการเรียกตรงจากหน้าเว็บ",
+    stations: "สถานีในทวีปนี้", worst: "สูงสุด"
+  },
+  en: {
+    eyebrow: "Live Air Density Index",
+    h1: 'The world\'s air,<br><em>made visible</em>',
+    sub: "AEROGRID pulls live readings from the WAQI monitoring network (12,000+ stations worldwide) onto a real map — the bigger and brighter a point, the denser the pollution in that area.",
+    statAvg: "Current global average AQI",
+    statCities: "Stations plotted on this map",
+    statDanger: "Stations at a dangerous level",
+    scanning: "Scanning monitoring stations",
+    refresh: "Refresh data",
+    apiKeyLabel: "WAQI API token:",
+    save: "Save",
+    legendTitle: "AQI scale",
+    bandGood: "Good", bandModerate: "Moderate", bandUsg: "Unhealthy for sensitive groups",
+    bandUnhealthy: "Unhealthy", bandVeryUnhealthy: "Very unhealthy", bandHazardous: "Hazardous",
+    sectionTitle: "Air density by continent",
+    sectionNote: "Live average AQI across every WAQI station currently plotted in each continent.",
+    disclosure: '* Once you add your own token, every number on this page is <strong>live real-time data from WAQI (aqicn.org)</strong>. Without a token, cards show a "waiting for data" state instead. Basemap © OpenStreetMap contributors, © CARTO',
+    footerLeft: "AEROGRID — Air Density Visualization · Live Build 2026",
+    footerRight: "Data source: World Air Quality Index Project (WAQI)",
+    loading: "Loading…", noKey: "Waiting for token", error: "Failed to load",
+    needKey: "No API token set — ", getKeyLink: "get one free from WAQI",
+    keyOk: "Token saved, fetching data…",
+    corsWarn: "If requests are blocked by the browser (CORS), proxy them through your own backend instead of calling directly from the page.",
+    stations: "stations in this continent", worst: "Highest"
+  },
+  zh: {
+    eyebrow: "空气密度实时指数",
+    h1: '让世界的空气<br><em>清晰可见</em>',
+    sub: "AEROGRID 从 WAQI 监测网络（全球超过 12,000 个监测站）获取实时数据并显示在真实地图上——光点越大越亮，代表该地区污染越密集。",
+    statAvg: "当前全球平均 AQI",
+    statCities: "地图上显示的监测站数",
+    statDanger: "处于危险级别的监测站",
+    scanning: "正在扫描监测站",
+    refresh: "刷新数据",
+    apiKeyLabel: "WAQI API 密钥：",
+    save: "保存",
+    legendTitle: "AQI 分级标准",
+    bandGood: "良好", bandModerate: "中等", bandUsg: "对敏感人群不健康",
+    bandUnhealthy: "不健康", bandVeryUnhealthy: "非常不健康", bandHazardous: "危险",
+    sectionTitle: "各大洲空气密度",
+    sectionNote: "各大洲目前显示的所有 WAQI 监测站的实时平均 AQI。",
+    disclosure: '* 输入您自己的密钥后，本页所有数字均为 <strong>来自 WAQI (aqicn.org) 的实时数据</strong>。未输入密钥时，卡片将显示“等待数据”状态。底图 © OpenStreetMap contributors, © CARTO',
+    footerLeft: "AEROGRID — 空气密度可视化 · 2026 实时版本",
+    footerRight: "数据来源：World Air Quality Index Project (WAQI)",
+    loading: "加载中…", noKey: "等待密钥", error: "加载失败",
+    needKey: "尚未设置 API 密钥 — ", getKeyLink: "前往 WAQI 免费申请",
+    keyOk: "密钥已保存，正在获取数据…",
+    corsWarn: "如果浏览器因 CORS 阻止请求，请通过您自己的后端代理调用，而不是从页面直接请求。",
+    stations: "个监测站", worst: "最高值"
+  }
+};
+
+const CONTINENT_NAME = {
+  asia:     {th:"เอเชีย",         en:"Asia",          zh:"亚洲"},
+  africa:   {th:"แอฟริกา",        en:"Africa",        zh:"非洲"},
+  namerica: {th:"อเมริกาเหนือ",   en:"North America", zh:"北美洲"},
+  samerica: {th:"อเมริกาใต้",     en:"South America", zh:"南美洲"},
+  europe:   {th:"ยุโรป",          en:"Europe",        zh:"欧洲"},
+  oceania:  {th:"โอเชียเนีย",     en:"Oceania",       zh:"大洋洲"}
+};
+const CONTINENT_ORDER = ["asia","africa","namerica","samerica","europe","oceania"];
+
+// Rough, non-authoritative bounding-box classification — good enough for a dashboard aggregate.
+function classifyContinent(lat, lon){
+  if (lat <= -8 && ((lon >= 110 && lon <= 180) || (lon >= -180 && lon < -150))) return "oceania";
+  if (lon >= -170 && lon < -30) return lat >= 13 ? "namerica" : "samerica";
+  if (lat > 37 && lon >= -25 && lon < 60) return "europe";
+  if (lat <= 37 && lon >= -20 && lon < 52) return "africa";
+  return "asia";
+}
+
+const BAND_COLOR = BCOL;
+const BAND_I18N_KEY = { good:"bandGood", moderate:"bandModerate", usg:"bandUsg", unhealthy:"bandUnhealthy", veryunhealthy:"bandVeryUnhealthy", hazardous:"bandHazardous" };
+function bandLabel(b){ return b ? I18N[S.lang][BAND_I18N_KEY[b]] : I18N[S.lang].noKey; }
+function radiusFor(aqi){ if(aqi==null) return 3; return Math.max(3, Math.min(16, 3 + aqi/22)); }
+
+/* ---------- map ---------- */
+let map, tileLayer;
+const TILES = {
+  dark:  { url:"https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", attribution:'&copy; OpenStreetMap contributors &copy; CARTO &copy; WAQI' },
+  light: { url:"https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", attribution:'&copy; OpenStreetMap contributors &copy; CARTO &copy; WAQI' }
+};
+function initMap(){
+  if (typeof L === 'undefined') return;
+  map = L.map('leafletMap', { worldCopyJump:true, minZoom:1.5, preferCanvas:true }).setView([15, 20], 2);
+  tileLayer = L.tileLayer(TILES[S.theme].url, { attribution:TILES[S.theme].attribution, maxZoom:19 }).addTo(map);
+  S.markerLayer = L.layerGroup().addTo(map);
+}
+function popupHtml(st){
+  const t = I18N[S.lang];
+  const name = esc(st.station && st.station.name ? st.station.name : `${st.lat.toFixed(2)}, ${st.lon.toFixed(2)}`);
+  const b = band(st.aqi);
+  if (b==null) return `<div class="popup-city">${name}</div><div class="popup-meta">${t.error}</div>`;
+  return `<div class="popup-city">${name}</div>
+    <div class="popup-aqi" style="color:${BAND_COLOR[b]}">${st.aqi}</div>
+    <div class="popup-band" style="color:${BAND_COLOR[b]}">${bandLabel(b)}</div>`;
+}
+function renderStationDots(){
+  if (!S.markerLayer) return;
+  S.markerLayer.clearLayers();
+  S.stations.forEach(st=>{
+    const b = band(st.aqi); if (b==null) return;
+    L.circleMarker([st.lat, st.lon], {
+      radius: radiusFor(st.aqi), weight:1, color:"rgba(255,255,255,0.35)",
+      fillColor: BAND_COLOR[b], fillOpacity:0.75
+    }).bindPopup(popupHtml(st)).addTo(S.markerLayer);
+  });
+}
+function applyTheme(){
+  document.documentElement.setAttribute('data-theme', S.theme);
+  if (map && tileLayer){
+    map.removeLayer(tileLayer);
+    tileLayer = L.tileLayer(TILES[S.theme].url, { attribution:TILES[S.theme].attribution, maxZoom:19 }).addTo(map);
+  }
+}
+
+/* ---------- continent cards + top stats ---------- */
+function renderContinentCards(){
+  const t = I18N[S.lang];
+  const grid = document.getElementById('continentGrid');
+  grid.innerHTML = "";
+  const byContinent = {}; CONTINENT_ORDER.forEach(c=>byContinent[c]=[]);
+  S.stations.forEach(st=>{ if (band(st.aqi)==null) return; const c = classifyContinent(st.lat, st.lon); if (byContinent[c]) byContinent[c].push(st); });
+
+  CONTINENT_ORDER.forEach(cont=>{
+    const list = byContinent[cont], hasData = list.length>0;
+    const avg = hasData ? Math.round(list.reduce((a,s)=>a+s.aqi,0)/list.length) : null;
+    const worst = hasData ? list.reduce((a,s)=>s.aqi>a.aqi?s:a, list[0]) : null;
+    const b = band(avg), color = b ? BAND_COLOR[b] : "#7E8B98";
+    const pct = avg!=null ? Math.min(100, avg/3.5) : 0;
+    const card = document.createElement('div');
+    card.className = "card"; card.tabIndex = 0;
+    card.innerHTML = `
+      <div class="card-top">
+        <div>
+          <div class="continent-name">${CONTINENT_NAME[cont][S.lang]}</div>
+          <div class="continent-city">${worst ? `${t.worst}: ${esc(worst.station ? worst.station.name : "")} (${worst.aqi})` : (S.waqiKey ? t.loading : t.noKey)}</div>
+        </div>
+        <div class="band-pill" style="background:${color}2e; color:${color};">${b ? bandLabel(b) : t.noKey}</div>
+      </div>
+      <div class="aqi-num ${avg==null?'skeleton':''}" style="color:${color};">${avg!=null ? avg : '···'}</div>
+      <div class="aqi-unit">AQI · WAQI</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%; background:${color};"></div></div>
+      <div class="card-foot"><span>${list.length} ${t.stations}</span></div>`;
+    grid.appendChild(card);
+  });
+}
+function refreshTopStats(){
+  const vals = S.stations.map(s=>s.aqi).filter(v=>v!=null && !isNaN(v));
+  const g = document.getElementById('globalAvg'), c = document.getElementById('statCities'), d = document.getElementById('statDanger');
+  c.textContent = vals.length || "—";
+  if (vals.length===0){ g.textContent = "—"; d.textContent = "—"; return; }
+  g.textContent = Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
+  d.textContent = vals.filter(v=>v>150).length;
+}
+
+/* ---------- WAQI fetch (one call for the whole world) ---------- */
+function setKeyStatusNeedKey(){
+  const t = I18N[S.lang];
+  document.getElementById('keyStatus').innerHTML = `${t.needKey}<a href="https://aqicn.org/data-platform/token/" target="_blank" rel="noopener">${t.getKeyLink}</a>`;
+}
+async function fetchAll(){
+  const btn = document.getElementById('refreshBtn');
+  if (!S.waqiKey){
+    setKeyStatusNeedKey();
+    S.stations = []; renderStationDots(); renderContinentCards(); refreshTopStats(); return;
+  }
+  btn.disabled = true;
+  document.getElementById('keyStatus').textContent = "";
+  try{
+    const url = `https://api.waqi.info/map/bounds/?latlng=-60,-180,85,180&token=${encodeURIComponent(S.waqiKey)}`;
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if (data.status === "ok"){
+      S.stations = data.data.map(s=>({ lat:s.lat, lon:s.lon, aqi: parseInt(s.aqi,10), station:s.station })).filter(s=>!isNaN(s.aqi));
+    } else {
+      document.getElementById('keyStatus').textContent = `${I18N[S.lang].error}: ${data.data || ""}`;
+      S.stations = [];
+    }
+  }catch(e){
+    document.getElementById('keyStatus').textContent = `${I18N[S.lang].error} (${I18N[S.lang].corsWarn})`;
+    S.stations = [];
+  }
+  renderStationDots(); renderContinentCards(); refreshTopStats();
+  btn.disabled = false;
+}
+
+/* ---------- home i18n ---------- */
+function renderLanguage(){
+  const t = I18N[S.lang];
+  document.querySelectorAll('#homeView [data-i18n]').forEach(el=>{ el.textContent = t[el.getAttribute('data-i18n')]; });
+  document.querySelectorAll('#homeView [data-i18n-html]').forEach(el=>{ el.innerHTML = t[el.getAttribute('data-i18n-html')]; });
+  if (!S.waqiKey) setKeyStatusNeedKey();
+  renderContinentCards(); renderStationDots(); refreshTopStats();
+}
+
+document.getElementById('apiKeySave').addEventListener('click', ()=>{
+  const val = document.getElementById('apiKeyInput').value.trim();
+  S.waqiKey = val; store.set('ag.waqi', val);
+  document.getElementById('keyStatus').textContent = val ? I18N[S.lang].keyOk : "";
+  fetchAll();
+});
+document.getElementById('refreshBtn').addEventListener('click', fetchAll);
+
+/* =====================================================================
+   Init — เริ่มที่หน้าแรกเสมอ (ถ้ามี session เดิมจะแสดงเมนูของผู้ใช้ที่แถบบน)
+   ===================================================================== */
+(async function init(){
+  S.view = 'home';
+  if (CFG.waqiToken) document.getElementById('keyWrap').style.display = 'none';
+  else if (S.waqiKey) document.getElementById('apiKeyInput').value = S.waqiKey;
+  initMap();
+  render();
+  if (S.waqiKey) fetchAll();
+  if (S.token){
+    try{ S.user = await API().me(); await refresh(true); startPolling(); render(); }
+    catch(e){ S.token=null; sess.set('ag.token',null); S.user=null; render(); }
+  }
+})();
+</script>
+</body>
+</html>
